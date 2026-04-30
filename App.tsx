@@ -136,6 +136,8 @@ const App: React.FC = () => {
     setChatInput('');
   };
 
+
+
   useEffect(() => {
     let timer: number;
     if (status === SessionStatus.ACTIVE) {
@@ -147,7 +149,10 @@ const App: React.FC = () => {
   }, [status]);
   const [isMuted, setIsMuted] = useState(false);
   const isMutedRef = useRef(isMuted);
+  const lastShiftTimeRef = useRef<number>(0);
   const micStreamRef = useRef<MediaStream | null>(null);
+  
+
 
   useEffect(() => {
     isMutedRef.current = isMuted;
@@ -164,6 +169,7 @@ const App: React.FC = () => {
   const sessionRef = useRef<any>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
   
   const inputAudioCtxRef = useRef<AudioContext | null>(null);
   const outputAudioCtxRef = useRef<AudioContext | null>(null);
@@ -467,33 +473,72 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [isScreenSharing, status]);
 
-  // Keyboard shortcut listener
-  useEffect(() => {
-    if (!shortcutKey || shortcutKey === 'None') return;
+  // Ref for keyboard handler state to avoid stale closures with empty dependency array
+  const keyboardHandlerStateRef = useRef({
+    status,
+    isScreenSharing,
+    shortcutKey,
+    stopSession,
+    startSession,
+    toggleScreenShare
+  });
 
+  useEffect(() => {
+    keyboardHandlerStateRef.current = {
+      status,
+      isScreenSharing,
+      shortcutKey,
+      stopSession,
+      startSession,
+      toggleScreenShare
+    };
+  }, [status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenShare]);
+
+  // Keyboard shortcut listener - Stable listener with empty dependency array for performance
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Avoid triggering when user is in an input field (if any exist)
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
-        return;
+      const {
+        status,
+        isScreenSharing,
+        shortcutKey,
+        stopSession,
+        startSession,
+        toggleScreenShare
+      } = keyboardHandlerStateRef.current;
+
+      // Shortcut toggle (Double Shift)
+      if (e.key === 'Shift') {
+        const now = Date.now();
+        if (now - lastShiftTimeRef.current < 500) {
+          // Double shift detected
+          if (status === SessionStatus.ACTIVE) {
+            stopSession();
+          } else if (status === SessionStatus.IDLE) {
+            startSession();
+            // Automatically start screen sharing for tutor experience
+            if (!isScreenSharing) toggleScreenShare();
+          }
+          lastShiftTimeRef.current = 0;
+        } else {
+          lastShiftTimeRef.current = now;
+        }
       }
 
+      // Legacy key shortcut
+      if (!shortcutKey || shortcutKey === 'None') return;
       if (e.code === shortcutKey || e.key === shortcutKey) {
         e.preventDefault();
-        
-        if (status === SessionStatus.IDLE || status === SessionStatus.ERROR) {
-          startSession();
-          if (!isScreenSharing) {
-            toggleScreenShare();
-          }
-        } else if (status === SessionStatus.ACTIVE || status === SessionStatus.CONNECTING) {
+        if (status === SessionStatus.ACTIVE) {
           stopSession();
+        } else if (status === SessionStatus.IDLE) {
+          startSession();
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [shortcutKey, status, isScreenSharing]); // Note: startSession/stopSession/toggleScreenShare don't have stable references, but omitting them here for simplicity or we can include them
+  }, []); // Empty dependency array
 
   return (
     <div className="flex flex-col h-screen bg-transparent text-white overflow-hidden relative">
@@ -538,9 +583,7 @@ const App: React.FC = () => {
             isSharing={isScreenSharing} 
             onToggle={toggleScreenShare} 
           />
-          <div className="hidden">
-            <canvas ref={canvasRef} />
-          </div>
+
         </div>
 
         {/* Right Side: Transcription & Chat History */}
@@ -580,6 +623,8 @@ const App: React.FC = () => {
             </button>
           </form>
         </div>
+        {/* Hidden canvas for automated frame streaming */}
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
       </main>
 
       <ControlPanel 
@@ -591,6 +636,8 @@ const App: React.FC = () => {
         onToggleScreen={toggleScreenShare}
         isScreenSharing={isScreenSharing}
       />
+
+
     </div>
   );
 };

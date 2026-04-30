@@ -4,6 +4,7 @@ export interface Transcription {
   role: 'user' | 'model';
   text: string;
   timestamp: number;
+  imageData?: string;
 }
 
 export enum SessionStatus {
