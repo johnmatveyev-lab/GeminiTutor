@@ -4,7 +4,17 @@ export interface Transcription {
   role: 'user' | 'model';
   text: string;
   timestamp: number;
-  imageData?: string;
+}
+
+export interface ChatSession {
+  id: string;
+  name: string;
+  transcriptions: Transcription[];
+  createdAt: number;
+  updatedAt: number;
+  duration: number;
+  tutorId: string;
+  voice: string;
 }
 
 export enum SessionStatus {

@@ -3,6 +3,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { Header } from './components/Header';
 import { TranscriptionList } from './components/TranscriptionList';
+import { SessionList } from './components/SessionList';
 import { ScreenShare } from './components/ScreenShare';
 import { ControlPanel } from './components/ControlPanel';
 import { 
@@ -12,7 +13,7 @@ import {
   FRAME_RATE, 
   JPEG_QUALITY 
 } from './constants';
-import { SessionStatus, Transcription, TutorType } from './types';
+import { SessionStatus, Transcription, TutorType, ChatSession } from './types';
 import { 
   decode, 
   decodeAudioData, 
@@ -22,21 +23,32 @@ import {
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<SessionStatus>(SessionStatus.IDLE);
-  const [transcriptions, setTranscriptions] = useState<Transcription[]>(() => {
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
     try {
-      const saved = localStorage.getItem('chat_history');
+      const saved = localStorage.getItem('chat_sessions');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
   });
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem('current_session_id');
+      return saved || null;
+    } catch {
+      return null;
+    }
+  });
+
+  const currentSession = sessions.find(s => s.id === currentSessionId) || null;
+  const transcriptions = currentSession?.transcriptions || [];
 
   const [selectedTutorId, setSelectedTutorId] = useState(() => {
-    return localStorage.getItem('selected_tutor_id') || TUTOR_TYPES[0].id;
+    return currentSession?.tutorId || localStorage.getItem('selected_tutor_id') || TUTOR_TYPES[0].id;
   });
 
   const [selectedVoice, setSelectedVoice] = useState(() => {
-    return localStorage.getItem('selected_voice') || 'Puck';
+    return currentSession?.voice || localStorage.getItem('selected_voice') || 'Puck';
   });
 
   const [shortcutKey, setShortcutKey] = useState(() => {
@@ -44,12 +56,7 @@ const App: React.FC = () => {
   });
 
   const [sessionDuration, setSessionDuration] = useState(() => {
-    try {
-      const saved = localStorage.getItem('session_duration');
-      return saved ? parseInt(saved, 10) : 0;
-    } catch {
-      return 0;
-    }
+    return currentSession?.duration || 0;
   });
 
   useEffect(() => {
@@ -64,6 +71,10 @@ const App: React.FC = () => {
     localStorage.setItem('shortcut_key', shortcutKey);
   }, [shortcutKey]);
 
+  useEffect(() => {
+    localStorage.setItem('current_session_id', currentSessionId || '');
+  }, [currentSessionId]);
+
   const transcriptionsRef = useRef(transcriptions);
   transcriptionsRef.current = transcriptions;
   
@@ -76,7 +87,26 @@ const App: React.FC = () => {
   const selectedVoiceRef = useRef(selectedVoice);
   selectedVoiceRef.current = selectedVoice;
 
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+
+  const currentSessionIdRef = useRef(currentSessionId);
+  currentSessionIdRef.current = currentSessionId;
+
   const [showAutoSaveToast, setShowAutoSaveToast] = useState(false);
+
+  const updateCurrentSession = useCallback((updates: Partial<ChatSession>) => {
+    if (!currentSessionIdRef.current) return;
+    
+    setSessions(prev => {
+      return prev.map(session => {
+        if (session.id === currentSessionIdRef.current) {
+          return { ...session, ...updates, updatedAt: Date.now() };
+        }
+        return session;
+      });
+    });
+  }, []);
 
   useEffect(() => {
     let saveInterval: number;
@@ -84,20 +114,21 @@ const App: React.FC = () => {
 
     if (status === SessionStatus.ACTIVE) {
       saveInterval = window.setInterval(() => {
-        localStorage.setItem('chat_history', JSON.stringify(transcriptionsRef.current));
-        localStorage.setItem('session_duration', sessionDurationRef.current.toString());
-        localStorage.setItem('selected_tutor_id', selectedTutorIdRef.current);
-        localStorage.setItem('selected_voice', selectedVoiceRef.current);
-        
-        setShowAutoSaveToast(true);
-        if (toastTimeout) window.clearTimeout(toastTimeout);
-        toastTimeout = window.setTimeout(() => setShowAutoSaveToast(false), 3000);
+        const currentSession = sessionsRef.current.find(s => s.id === currentSessionIdRef.current);
+        if (currentSession) {
+          localStorage.setItem('chat_sessions', JSON.stringify(sessionsRef.current));
+          localStorage.setItem('current_session_id', currentSessionIdRef.current || '');
+          
+          setShowAutoSaveToast(true);
+          if (toastTimeout) window.clearTimeout(toastTimeout);
+          toastTimeout = window.setTimeout(() => setShowAutoSaveToast(false), 3000);
+        }
       }, 60000);
     }
 
     const handleBeforeUnload = () => {
-      localStorage.setItem('chat_history', JSON.stringify(transcriptionsRef.current));
-      localStorage.setItem('session_duration', sessionDurationRef.current.toString());
+      localStorage.setItem('chat_sessions', JSON.stringify(sessionsRef.current));
+      localStorage.setItem('current_session_id', currentSessionIdRef.current || '');
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
@@ -106,9 +137,8 @@ const App: React.FC = () => {
       if (toastTimeout) window.clearTimeout(toastTimeout);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       
-      // Save state when session stops or component unmounts
-      localStorage.setItem('chat_history', JSON.stringify(transcriptionsRef.current));
-      localStorage.setItem('session_duration', sessionDurationRef.current.toString());
+      localStorage.setItem('chat_sessions', JSON.stringify(sessionsRef.current));
+      localStorage.setItem('current_session_id', currentSessionIdRef.current || '');
     };
   }, [status]);
 
@@ -116,10 +146,56 @@ const App: React.FC = () => {
   const [activeOutputText, setActiveOutputText] = useState('');
   const [chatInput, setChatInput] = useState('');
 
+  const createNewSession = useCallback(() => {
+    const newSession: ChatSession = {
+      id: Date.now().toString(),
+      name: `Session ${sessions.length + 1}`,
+      transcriptions: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      duration: 0,
+      tutorId: selectedTutorId,
+      voice: selectedVoice
+    };
+    
+    setSessions(prev => [...prev, newSession]);
+    setCurrentSessionId(newSession.id);
+    setSessionDuration(0);
+    setActiveInputText('');
+    setActiveOutputText('');
+  }, [sessions.length, selectedTutorId, selectedVoice]);
+
+  const selectSession = useCallback((sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    const session = sessions.find(s => s.id === sessionId);
+    if (session) {
+      setSessionDuration(session.duration);
+      setSelectedTutorId(session.tutorId);
+      setSelectedVoice(session.voice);
+      setActiveInputText('');
+      setActiveOutputText('');
+    }
+  }, [sessions]);
+
+  const deleteSession = useCallback((sessionId: string) => {
+    setSessions(prev => prev.filter(s => s.id !== sessionId));
+    if (currentSessionId === sessionId) {
+      const remainingSessions = sessions.filter(s => s.id !== sessionId);
+      if (remainingSessions.length > 0) {
+        selectSession(remainingSessions[0].id);
+      } else {
+        setCurrentSessionId(null);
+        setSessionDuration(0);
+        setActiveInputText('');
+        setActiveOutputText('');
+      }
+    }
+  }, [currentSessionId, sessions, selectSession]);
+
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
     const text = chatInput.trim();
-    if (!text || !sessionRef.current || status !== SessionStatus.ACTIVE) return;
+    if (!text || !sessionRef.current || status !== SessionStatus.ACTIVE || !currentSessionId) return;
 
     sessionRef.current.send({
       clientContent: {
@@ -128,10 +204,16 @@ const App: React.FC = () => {
       }
     });
 
-    setTranscriptions(prev => [
-      ...prev,
-      { id: Date.now().toString() + '-user-text', role: 'user', text, timestamp: Date.now() }
-    ]);
+    const newTranscription: Transcription = {
+      id: Date.now().toString() + '-user-text',
+      role: 'user',
+      text,
+      timestamp: Date.now()
+    };
+
+    updateCurrentSession({
+      transcriptions: [...(currentSession?.transcriptions || []), newTranscription]
+    });
     
     setChatInput('');
   };
@@ -141,12 +223,18 @@ const App: React.FC = () => {
   useEffect(() => {
     let timer: number;
     if (status === SessionStatus.ACTIVE) {
-      timer = window.setInterval(() => setSessionDuration(s => s + 1), 1000);
+      timer = window.setInterval(() => {
+        setSessionDuration(s => {
+          const newDuration = s + 1;
+          updateCurrentSession({ duration: newDuration });
+          return newDuration;
+        });
+      }, 1000);
     }
     return () => {
       if (timer) clearInterval(timer);
     }
-  }, [status]);
+  }, [status, updateCurrentSession]);
   const [isMuted, setIsMuted] = useState(false);
   const isMutedRef = useRef(isMuted);
   const lastShiftTimeRef = useRef<number>(0);
@@ -289,18 +377,34 @@ const App: React.FC = () => {
     }
 
     if (message.serverContent?.turnComplete) {
+      const newTranscriptions: Transcription[] = [];
+      
       if (currentInputText.current.trim()) {
-        setTranscriptions(prev => [
-          ...prev, 
-          { id: Date.now().toString() + '-user', role: 'user', text: currentInputText.current, timestamp: Date.now() }
-        ]);
+        newTranscriptions.push({
+          id: Date.now().toString() + '-user',
+          role: 'user',
+          text: currentInputText.current,
+          timestamp: Date.now()
+        });
       }
       if (currentOutputText.current.trim()) {
-        setTranscriptions(prev => [
-          ...prev, 
-          { id: Date.now().toString() + '-model', role: 'model', text: currentOutputText.current, timestamp: Date.now() }
-        ]);
+        newTranscriptions.push({
+          id: Date.now().toString() + '-model',
+          role: 'model',
+          text: currentOutputText.current,
+          timestamp: Date.now()
+        });
       }
+
+      if (newTranscriptions.length > 0 && currentSessionIdRef.current) {
+        const currentSession = sessionsRef.current.find(s => s.id === currentSessionIdRef.current);
+        if (currentSession) {
+          updateCurrentSession({
+            transcriptions: [...currentSession.transcriptions, ...newTranscriptions]
+          });
+        }
+      }
+
       currentInputText.current = '';
       currentOutputText.current = '';
       setActiveInputText('');
@@ -322,6 +426,10 @@ const App: React.FC = () => {
       setStatus(SessionStatus.CONNECTING);
       setSessionDuration(0);
       
+      if (!currentSessionId) {
+        createNewSession();
+      }
+      
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
       aiRef.current = ai;
 
@@ -336,8 +444,9 @@ const App: React.FC = () => {
         track.enabled = !isMutedRef.current;
       });
 
-      const historyContext = transcriptions.length > 0 
-        ? `\n\nPREVIOUS CONVERSATION HISTORY:\n${transcriptions.slice(-20).map(t => `${t.role === 'user' ? 'User' : 'Tutor'}: ${t.text}`).join('\n')}`
+      const currentSessionData = sessionsRef.current.find(s => s.id === currentSessionIdRef.current);
+      const historyContext = currentSessionData?.transcriptions && currentSessionData.transcriptions.length > 0 
+        ? `\n\nPREVIOUS CONVERSATION HISTORY:\n${currentSessionData.transcriptions.slice(-20).map(t => `${t.role === 'user' ? 'User' : 'Tutor'}: ${t.text}`).join('\n')}`
         : '';
       const baseInstruction = selectedTutor?.systemInstruction || TUTOR_TYPES[0].systemInstruction;
       const systemInstruction = baseInstruction + historyContext + `\n\nCRITICAL INSTRUCTION: If you detect the user made a mistake in their coding or input based on their speech or screen share, you MUST start your spoken response with the exact uppercase string "[ERROR]". This will trigger the UI to highlight the error.`;
@@ -391,16 +500,6 @@ const App: React.FC = () => {
       setStatus(SessionStatus.ERROR);
     }
   };
-
-  const hasAutoStarted = useRef(false);
-
-  useEffect(() => {
-    if (!hasAutoStarted.current && transcriptions.length > 0 && status === SessionStatus.IDLE) {
-      hasAutoStarted.current = true;
-      startSession();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const toggleScreenShare = async () => {
     if (isScreenSharing) {
@@ -576,8 +675,15 @@ const App: React.FC = () => {
       </div>
       
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden p-6 gap-6 relative z-10 pb-32 max-w-7xl mx-auto w-full">
-        {/* Left Side: Screen & Visuals */}
+        {/* Left Side: Sessions & Screen */}
         <div className="flex-1 flex flex-col gap-6 overflow-hidden">
+          <SessionList 
+            sessions={sessions}
+            currentSessionId={currentSessionId}
+            onSelectSession={selectSession}
+            onCreateSession={createNewSession}
+            onDeleteSession={deleteSession}
+          />
           <ScreenShare 
             videoRef={videoRef} 
             isSharing={isScreenSharing} 
@@ -595,8 +701,10 @@ const App: React.FC = () => {
               activeInputText={activeInputText}
               activeOutputText={activeOutputText}
               onClear={() => {
-                setTranscriptions([]);
-                setSessionDuration(0);
+                if (currentSessionId) {
+                  updateCurrentSession({ transcriptions: [] });
+                  setSessionDuration(0);
+                }
               }}
             />
           </div>

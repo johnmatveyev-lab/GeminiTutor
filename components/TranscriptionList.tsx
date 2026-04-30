@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Transcription, SessionStatus } from '../types';
 
 interface TranscriptionListProps {
@@ -18,11 +18,35 @@ export const TranscriptionList: React.FC<TranscriptionListProps> = ({
   onClear 
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const prevTranscriptionsLength = useRef(transcriptions.length);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+      setIsUserScrolling(!isAtBottom);
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll);
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer) return;
+
+    const hasNewMessages = transcriptions.length > prevTranscriptionsLength.current;
+    const hasNewActivity = activeInputText || activeOutputText;
+
+    if (hasNewMessages || hasNewActivity) {
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
     }
+
+    prevTranscriptionsLength.current = transcriptions.length;
   }, [transcriptions, activeInputText, activeOutputText]);
 
   return (
