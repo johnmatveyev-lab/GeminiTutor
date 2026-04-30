@@ -1,0 +1,10 @@
+{
+  "name": "Gemini Guided Tutor",
+  "description": "A real-time guided learning platform that uses Gemini Live to see your screen and provide step-by-step audio guidance as you learn new skills.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "display-capture"
+  ],
+  "majorCapabilities": []
+}
