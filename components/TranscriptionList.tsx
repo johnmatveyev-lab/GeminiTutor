@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Transcription, SessionStatus } from '../types';
 
 interface TranscriptionListProps {
@@ -9,6 +9,8 @@ interface TranscriptionListProps {
   activeOutputText: string;
   onClear: () => void;
 }
+
+const VISIBLE_MESSAGE_COUNT = 50; // Only render 50 messages at a time for performance
 
 export const TranscriptionList: React.FC<TranscriptionListProps> = ({ 
   transcriptions, 
@@ -20,6 +22,18 @@ export const TranscriptionList: React.FC<TranscriptionListProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const prevTranscriptionsLength = useRef(transcriptions.length);
+  const [visibleRange, setVisibleRange] = useState({ start: 0, end: VISIBLE_MESSAGE_COUNT });
+
+  // Calculate visible messages for performance
+  const visibleTranscriptions = useMemo(() => {
+    const total = transcriptions.length;
+    if (total <= VISIBLE_MESSAGE_COUNT) {
+      return transcriptions;
+    }
+    
+    // Show the most recent messages
+    return transcriptions.slice(-VISIBLE_MESSAGE_COUNT);
+  }, [transcriptions]);
 
   useEffect(() => {
     const scrollContainer = scrollRef.current;
@@ -57,6 +71,11 @@ export const TranscriptionList: React.FC<TranscriptionListProps> = ({
           <span className="text-[11px] px-2.5 py-1 bg-black/40 rounded-full text-white/60 font-medium">
             {transcriptions.length} Messages
           </span>
+          {transcriptions.length > VISIBLE_MESSAGE_COUNT && (
+            <span className="text-[10px] px-2 py-1 bg-[#0A84FF]/20 rounded-full text-[#0A84FF]/80 font-medium">
+              Showing last {VISIBLE_MESSAGE_COUNT}
+            </span>
+          )}
           {transcriptions.length > 0 && (
             <button 
               onClick={onClear} 
@@ -90,10 +109,10 @@ export const TranscriptionList: React.FC<TranscriptionListProps> = ({
           </div>
         )}
 
-        {transcriptions.map((t, i) => {
+        {visibleTranscriptions.map((t, i) => {
           const isUser = t.role === 'user';
           // Check if previous message was same role to stack them tighter
-          const isContinuous = i > 0 && transcriptions[i-1].role === t.role;
+          const isContinuous = i > 0 && visibleTranscriptions[i-1].role === t.role;
           
           return (
             <div 

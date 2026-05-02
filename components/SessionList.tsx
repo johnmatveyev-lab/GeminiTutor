@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ChatSession } from '../types';
 
 interface SessionListProps {
@@ -7,6 +7,7 @@ interface SessionListProps {
   onSelectSession: (sessionId: string) => void;
   onCreateSession: () => void;
   onDeleteSession: (sessionId: string) => void;
+  onRenameSession?: (sessionId: string, newName: string) => void;
 }
 
 export const SessionList: React.FC<SessionListProps> = ({
@@ -14,8 +15,12 @@ export const SessionList: React.FC<SessionListProps> = ({
   currentSessionId,
   onSelectSession,
   onCreateSession,
-  onDeleteSession
+  onDeleteSession,
+  onRenameSession
 }) => {
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -31,6 +36,35 @@ export const SessionList: React.FC<SessionListProps> = ({
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
+
+  const handleStartEdit = (session: ChatSession, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSessionId(session.id);
+    setEditingName(session.name);
+  };
+
+  const handleSaveEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (editingSessionId && editingName.trim() && onRenameSession) {
+      onRenameSession(editingSessionId, editingName.trim());
+    }
+    setEditingSessionId(null);
+    setEditingName('');
+  };
+
+  const handleCancelEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSessionId(null);
+    setEditingName('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit(e as any);
+    } else if (e.key === 'Escape') {
+      handleCancelEdit(e as any);
+    }
   };
 
   return (
@@ -66,32 +100,86 @@ export const SessionList: React.FC<SessionListProps> = ({
                   : 'bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10'
               }`}
               onClick={() => onSelectSession(session.id)}
+              onDoubleClick={(e) => handleStartEdit(session, e)}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-[14px] font-semibold text-white/90 truncate mb-1">
-                    {session.name}
-                  </h3>
-                  <div className="flex items-center gap-2 text-[11px] text-white/50">
-                    <span>{formatDate(session.updatedAt)}</span>
-                    <span>•</span>
-                    <span>{session.transcriptions.length} messages</span>
-                    <span>•</span>
-                    <span>{formatDuration(session.duration)}</span>
-                  </div>
+                  {editingSessionId === session.id ? (
+                    <input
+                      type="text"
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      onBlur={handleCancelEdit}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-sm font-medium outline-none focus:border-[#0A84FF]"
+                      autoFocus
+                    />
+                  ) : (
+                    <>
+                      <h3 className="text-[14px] font-semibold text-white/90 truncate mb-1">
+                        {session.name}
+                      </h3>
+                      <div className="flex items-center gap-2 text-[11px] text-white/50">
+                        <span>{formatDate(session.updatedAt)}</span>
+                        <span>•</span>
+                        <span>{session.transcriptions.length} messages</span>
+                        <span>•</span>
+                        <span>{formatDuration(session.duration)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteSession(session.id);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-white/10 rounded-lg transition-all text-white/40 hover:text-[#FF453A]"
-                  title="Delete session"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-1">
+                  {editingSessionId === session.id ? (
+                    <>
+                      <button
+                        onClick={handleSaveEdit}
+                        className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-white/60 hover:text-[#34C759]"
+                        title="Save"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-white/60 hover:text-[#FF453A]"
+                        title="Cancel"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {onRenameSession && (
+                        <button
+                          onClick={(e) => handleStartEdit(session, e)}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-white/10 rounded-lg transition-all text-white/40 hover:text-white"
+                          title="Rename session"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteSession(session.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-white/10 rounded-lg transition-all text-white/40 hover:text-[#FF453A]"
+                        title="Delete session"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           ))

@@ -87,5 +87,12 @@ export const AUDIO_CONFIG = {
   outputSampleRate: 24000
 };
 
-export const FRAME_RATE = 1; // Frames per second
-export const JPEG_QUALITY = 0.6;
+export const FRAME_RATE = 2; // Increased to 2 FPS for better responsiveness
+export const JPEG_QUALITY = 0.7; // Increased quality for better AI understanding
+
+// Adaptive quality settings based on network conditions
+export const ADAPTIVE_QUALITY = {
+  high: { fps: 3, quality: 0.8 },
+  medium: { fps: 2, quality: 0.7 },
+  low: { fps: 1, quality: 0.5 }
+};
