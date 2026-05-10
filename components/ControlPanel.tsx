@@ -35,22 +35,22 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   return (
     <div className="fixed bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 z-50">
-      <div className="flex items-center gap-2 text-white/40 text-[10px] uppercase tracking-[0.2em] font-medium bg-black/20 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/5">
+      <div className="flex items-center gap-2 text-white/40 text-[10px] uppercase tracking-[0.2em] font-medium glass px-4 py-1.5 rounded-full">
         <div className="flex items-center gap-1.5">
           <span className="text-white/60">Double Shift</span>
           <span>{isActive ? 'End' : 'Start'} Session</span>
         </div>
       </div>
-      
-      <div className="flex items-center gap-3 bg-[#1C1C1E]/80 backdrop-blur-3xl border border-white/10 px-4 py-3 rounded-full shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-500 ease-out hover:scale-105">
+
+      <div className="flex items-center gap-3 liquid-glass-strong px-4 py-3 rounded-full transition-all duration-500 ease-out hover:scale-105">
         {/* Mic Button */}
         <button
           onClick={onToggleMute}
           disabled={!isActive}
           className={`w-14 h-14 flex items-center justify-center rounded-full transition-all duration-300 ${
-            isMuted 
-              ? 'bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/30' 
-              : 'bg-white/5 text-white/90 hover:bg-white/15 border border-white/5 disabled:opacity-30 disabled:hover:bg-white/5'
+            isMuted
+              ? 'bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/30 shadow-glass'
+              : 'bg-white/5 text-white/90 hover:bg-white/15 border border-white/5 disabled:opacity-30 disabled:hover:bg-white/5 shadow-liquid'
           }`}
           title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
         >
@@ -70,7 +70,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         {isActive ? (
           <button
             onClick={onStop}
-            className="px-8 h-14 bg-[#FF453A] hover:bg-[#FF3B30] text-white rounded-full font-semibold transition-all duration-300 flex items-center gap-3 shadow-lg shadow-[#FF453A]/20 active:scale-95 text-[13px] uppercase tracking-wider"
+            className="px-8 h-14 bg-[#FF453A] hover:bg-[#FF3B30] text-white rounded-full font-semibold transition-all duration-300 flex items-center gap-3 shadow-glass hover:shadow-glass-hover active:scale-95 text-[13px] uppercase tracking-wider neon-glow-hover"
           >
             <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />
             End Session
@@ -79,7 +79,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <button
             onClick={onStart}
             disabled={isConnecting}
-            className="px-8 h-14 bg-white text-black hover:bg-white/90 disabled:bg-white/20 disabled:text-white/50 rounded-full font-semibold transition-all duration-300 flex items-center gap-2.5 shadow-lg shadow-white/10 active:scale-95 text-[13px] uppercase tracking-wider"
+            className="px-8 h-14 bg-white text-black hover:bg-white/90 disabled:bg-white/20 disabled:text-white/50 rounded-full font-semibold transition-all duration-300 flex items-center gap-2.5 shadow-glass hover:shadow-glass-hover active:scale-95 text-[13px] uppercase tracking-wider"
           >
             {isConnecting ? (
               <>
@@ -102,9 +102,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <button
           onClick={onToggleScreen}
           className={`w-14 h-14 flex items-center justify-center rounded-full transition-all duration-300 ${
-            isScreenSharing 
-              ? 'bg-[#0A84FF]/20 text-[#0A84FF] border border-[#0A84FF]/30' 
-              : 'bg-white/5 text-white/90 hover:bg-white/15 border border-white/5'
+            isScreenSharing
+              ? 'bg-[#0A84FF]/20 text-[#0A84FF] border border-[#0A84FF]/30 shadow-glass neon-glow'
+              : 'bg-white/5 text-white/90 hover:bg-white/15 border border-white/5 shadow-liquid'
           }`}
           title={isScreenSharing ? "Stop Screen Share" : "Start Screen Share"}
         >
@@ -118,9 +118,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           onClick={onToggleBrowserControl}
           disabled={!canUseBrowserControl}
           className={`w-14 h-14 flex items-center justify-center rounded-full transition-all duration-300 ${
-            isBrowserControlEnabled 
-              ? 'bg-[#0A84FF]/25 text-[#64D2FF] border border-[#64D2FF]/40 shadow-[0_0_24px_rgba(10,132,255,0.35)]' 
-              : 'bg-white/5 text-white/90 hover:bg-white/15 border border-white/5 disabled:opacity-30 disabled:hover:bg-white/5'
+            isBrowserControlEnabled
+              ? 'bg-[#0A84FF]/25 text-[#64D2FF] border border-[#64D2FF]/40 shadow-glass neon-glow'
+              : 'bg-white/5 text-white/90 hover:bg-white/15 border border-white/5 disabled:opacity-30 disabled:hover:bg-white/5 shadow-liquid'
           }`}
           title={
             isBrowserControlEnabled

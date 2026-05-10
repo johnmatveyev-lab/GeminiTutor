@@ -57,9 +57,9 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="mx-auto max-w-4xl px-5 py-3 border border-[#05726e] flex justify-between items-center bg-[#000000] backdrop-blur-3xl rounded-full shadow-2xl transition-all duration-500 text-[#045846] font-[Georgia]">
+    <header className="mx-auto max-w-4xl px-5 py-3 border border-[#05726e] flex justify-between items-center liquid-glass-strong rounded-full shadow-glass transition-all duration-500 text-[#045846] font-[Georgia]">
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 bg-[#0095b1] border border-[#08f4ff] rounded-full flex items-center justify-center shadow-lg shadow-[#0A84FF]/20">
+        <div className="w-12 h-12 liquid-glass rounded-full flex items-center justify-center shadow-glass neon-glow">
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
@@ -69,15 +69,15 @@ export const Header: React.FC<HeaderProps> = ({
           <p className="text-[11px] uppercase tracking-wider text-white/50 font-medium">Real-time Visually Aware AI</p>
         </div>
       </div>
-      
+
       <div className="flex items-center gap-4">
         {(status === SessionStatus.ACTIVE || sessionDuration > 0) && (
-          <div className={`font-mono font-medium text-[13px] px-3 py-1 bg-black/20 rounded-full transition-colors ${status === SessionStatus.ACTIVE ? 'text-white/80' : 'text-white/40'}`}>
+          <div className={`font-mono font-medium text-[13px] px-3 py-1 glass rounded-full transition-colors ${status === SessionStatus.ACTIVE ? 'text-white/80' : 'text-white/40'}`}>
             {formatTime(sessionDuration)}
           </div>
         )}
 
-        <div className="flex items-center gap-2.5 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/5">
+        <div className="flex items-center gap-2.5 glass px-4 py-2 rounded-full">
           <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor()} shadow-md animate-pulse`} />
           <span className="text-[11px] font-semibold text-white/80 uppercase tracking-widest">
             {getStatusText()}
@@ -86,9 +86,9 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Settings Menu */}
         <div className="relative">
-          <button 
+          <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-black/20 hover:bg-white/10 border border-white/5 transition-colors"
+            className="w-10 h-10 flex items-center justify-center rounded-full glass hover:bg-white/10 transition-colors"
             title="Settings"
           >
             <svg className="w-5 h-5 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,11 +96,11 @@ export const Header: React.FC<HeaderProps> = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </button>
-          
+
           {isMenuOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
-              <div className="absolute right-0 top-14 w-72 bg-[#1C1C1E]/95 backdrop-blur-3xl border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden transform origin-top-right transition-all">
+              <div className="absolute right-0 top-14 w-72 liquid-glass-strong rounded-2xl shadow-glass z-50 overflow-hidden transform origin-top-right transition-all">
                 <div className="p-4 border-b border-white/5">
                   <h3 className="text-[13px] font-semibold text-white/90 uppercase tracking-widest mb-1">Tutor Personality</h3>
                   <p className="text-[11px] text-white/50 leading-relaxed">Select the teaching style that works best for you. (Takes effect on next start)</p>
@@ -129,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
                     </button>
                   ))}
                 </div>
-                <div className="p-4 bg-black/20">
+                <div className="p-4 glass">
                   <h3 className="text-[13px] font-semibold text-white/90 uppercase tracking-widest mb-2 flex items-center justify-between">
                     <span>Voice</span>
                   </h3>
@@ -137,7 +137,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <select
                       value={selectedVoice}
                       onChange={(e) => onVoiceSelect(e.target.value)}
-                      className="w-full appearance-none bg-white/5 border border-white/10 hover:border-white/20 rounded-xl px-4 py-2.5 text-[14px] font-medium text-white outline-none cursor-pointer transition-colors"
+                      className="w-full appearance-none glass border border-white/10 hover:border-white/20 rounded-xl px-4 py-2.5 text-[14px] font-medium text-white outline-none cursor-pointer transition-colors"
                     >
                       {AVAILABLE_VOICES.map(voice => (
                         <option key={voice} value={voice} className="bg-[#1C1C1E] text-white">
@@ -152,7 +152,7 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </div>
                 </div>
-                <div className="p-4 bg-black/20 border-t border-white/5">
+                <div className="p-4 glass border-t border-white/5">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <h3 className="text-[13px] font-semibold text-white/90 uppercase tracking-widest mb-1">Browser Control Skill</h3>
@@ -168,8 +168,8 @@ export const Header: React.FC<HeaderProps> = ({
                       onClick={() => onBrowserControlSkillChange(!isBrowserControlSkillEnabled)}
                       className={`relative w-12 h-7 rounded-full border transition-colors ${
                         isBrowserControlSkillEnabled
-                          ? 'bg-[#0A84FF]/80 border-[#64D2FF]/40'
-                          : 'bg-white/10 border-white/10'
+                          ? 'bg-[#0A84FF]/80 border-[#64D2FF]/40 neon-glow'
+                          : 'glass border-white/10'
                       }`}
                       aria-pressed={isBrowserControlSkillEnabled}
                       title={isBrowserControlSkillEnabled ? 'Disable Browser Control Skill' : 'Enable Browser Control Skill'}
@@ -182,7 +182,7 @@ export const Header: React.FC<HeaderProps> = ({
                     </button>
                   </div>
                 </div>
-                <div className="p-4 bg-black/20 border-t border-white/5">
+                <div className="p-4 glass border-t border-white/5">
                   <h3 className="text-[13px] font-semibold text-white/90 uppercase tracking-widest mb-2 flex items-center justify-between">
                     <span>Quick Start Shortcut</span>
                   </h3>
@@ -200,11 +200,11 @@ export const Header: React.FC<HeaderProps> = ({
                       }
                     }}
                     onBlur={() => setIsRecordingKey(false)}
-                    className={`w-full text-left bg-white/5 border ${isRecordingKey ? 'border-[#0A84FF] ring-2 ring-[#0A84FF]/50' : 'border-white/10 hover:border-white/20'} rounded-xl px-4 py-2.5 text-[14px] font-medium text-white transition-colors flex justify-between items-center`}
+                    className={`w-full text-left glass border ${isRecordingKey ? 'border-[#0A84FF] ring-2 ring-[#0A84FF]/50 neon-glow' : 'border-white/10 hover:border-white/20'} rounded-xl px-4 py-2.5 text-[14px] font-medium text-white transition-colors flex justify-between items-center`}
                   >
                     <span>{isRecordingKey ? 'Press any key...' : shortcutKey || 'None'}</span>
                     {!isRecordingKey && (
-                      <span className="text-[10px] uppercase text-white/50 bg-white/5 px-2 py-1 rounded">Edit</span>
+                      <span className="text-[10px] uppercase text-white/50 glass px-2 py-1 rounded">Edit</span>
                     )}
                   </button>
                 </div>

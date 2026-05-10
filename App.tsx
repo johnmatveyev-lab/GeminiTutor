@@ -420,6 +420,7 @@ const App: React.FC = () => {
       }
     });
 
+    const currentSessionData = sessionsRef.current.find(s => s.id === currentSessionId);
     const newTranscription: Transcription = {
       id: Date.now().toString() + '-user-text',
       role: 'user',
@@ -428,7 +429,7 @@ const App: React.FC = () => {
     };
 
     updateCurrentSession({
-      transcriptions: [...(currentSession?.transcriptions || []), newTranscription]
+      transcriptions: [...(currentSessionData?.transcriptions || []), newTranscription]
     });
 
     setChatInput('');
@@ -1319,15 +1320,15 @@ Proceed with this browser task now using the browser_control tool and the visibl
     <div className="flex flex-col h-screen bg-transparent text-white overflow-hidden relative">
       {/* Connection Error Toast */}
       {connectionError && (
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 bg-[#FF453A]/95 backdrop-blur-xl border border-white/20 text-white px-6 py-4 rounded-full flex items-center gap-3 shadow-[0_0_30px_rgba(255,69,58,0.3)] animate-in fade-in slide-in-from-top-4 duration-300 max-w-md">
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 liquid-glass-strong border border-[#FF453A]/30 text-white px-6 py-4 rounded-full flex items-center gap-3 shadow-glass neon-glow max-w-md">
           <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77-1.333.192 3 1.732 3z" />
           </svg>
           <div className="flex-1">
             <p className="text-sm font-semibold tracking-wide mb-1">Connection Error</p>
             <p className="text-xs text-white/80">{connectionError}</p>
           </div>
-          <button 
+          <button
             onClick={() => setConnectionError(null)}
             className="p-1 hover:bg-white/10 rounded-full transition-colors"
           >
@@ -1335,6 +1336,165 @@ Proceed with this browser task now using the browser_control tool and the visibl
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+        </div>
+      )}
+
+      {/* Screen Share Error Toast */}
+      {screenShareError && (
+        <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-50 liquid-glass-strong border border-[#FF9F0A]/30 text-white px-6 py-4 rounded-full flex items-center gap-3 shadow-glass max-w-md">
+          <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77-1.333.192 3 1.732 3z" />
+          </svg>
+          <div className="flex-1">
+            <p className="text-sm font-semibold tracking-wide mb-1">Screen Share Error</p>
+            <p className="text-xs text-white/80">{screenShareError}</p>
+          </div>
+          <button
+            onClick={() => setScreenShareError(null)}
+            className="p-1 hover:bg-white/10 rounded-full transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Browser Control Error Toast */}
+      {browserControlError && (
+        <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-50 liquid-glass-strong border border-[#0A84FF]/30 text-white px-6 py-4 rounded-full flex items-center gap-3 shadow-glass neon-glow max-w-md">
+          <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3a9 9 0 100 18 9 9 0 000-18z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.6 9h16.8M3.6 15h16.8M12 3c2.1 2.4 3.2 5.4 3.2 9S14.1 18.6 12 21c-2.1-2.4-3.2-5.4-3.2-9S9.9 5.4 12 3z" />
+          </svg>
+          <div className="flex-1">
+            <p className="text-sm font-semibold tracking-wide mb-1">Browser Control</p>
+            <p className="text-xs text-white/80">{browserControlError}</p>
+          </div>
+          <button
+            onClick={() => setBrowserControlError(null)}
+            className="p-1 hover:bg-white/10 rounded-full transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Browser Task Confirmation Dialog */}
+      {pendingBrowserTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="liquid-glass-strong border border-[#0A84FF]/30 rounded-3xl p-6 shadow-glass neon-glow max-w-md mx-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 liquid-glass rounded-full flex items-center justify-center neon-glow">
+                <svg className="w-5 h-5 text-[#64D2FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3a9 9 0 100 18 9 9 0 000-18z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.6 9h16.8M3.6 15h16.8M12 3c2.1 2.4 3.2 5.4 3.2 9S14.1 18.6 12 21c-2.1-2.4-3.2-5.4-3.2-9S9.9 5.4 12 3z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-white">Use Browser Control?</h3>
+            </div>
+            <p className="text-white/70 mb-4 leading-relaxed">
+              Confirm that the agent should use the shared Chrome browser for this request.
+            </p>
+            <div className="glass border border-white/10 rounded-2xl px-4 py-3 text-sm text-white/85 mb-6 max-h-28 overflow-y-auto">
+              {pendingBrowserTask}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={cancelBrowserTask}
+                className="flex-1 px-4 py-3 glass hover:bg-white/10 border border-white/10 rounded-xl text-white font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmBrowserTask}
+                className="flex-1 px-4 py-3 bg-[#0A84FF] hover:bg-[#0071E3] text-white rounded-xl font-medium transition-colors shadow-glass neon-glow-hover"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Session Switch Warning Dialog */}
+      {sessionSwitchWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="liquid-glass-strong border border-white/10 rounded-3xl p-6 shadow-glass max-w-md mx-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 liquid-glass rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#FF9F0A]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77-1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-white">
+                {pendingSessionId === null ? 'Delete Active Session?' : 'Active Session in Progress'}
+              </h3>
+            </div>
+            <p className="text-white/70 mb-6 leading-relaxed">
+              {pendingSessionId === null
+                ? 'You have an active tutoring session. Deleting this session will end it and remove all data. Are you sure you want to continue?'
+                : 'You have an active tutoring session. Switching sessions will end the current session. Are you sure you want to continue?'
+              }
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={cancelSessionSwitch}
+                className="flex-1 px-4 py-3 glass hover:bg-white/10 border border-white/10 rounded-xl text-white font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSessionSwitch}
+                className="flex-1 px-4 py-3 bg-[#FF9F0A] hover:bg-[#FF9F0A]/90 text-white rounded-xl font-medium transition-colors shadow-glass"
+              >
+                {pendingSessionId === null ? 'End & Delete' : 'End & Switch'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* API Key Error Toast */}
+      {apiKeyError && (
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 liquid-glass-strong border border-[#FF453A]/30 text-white px-6 py-4 rounded-full flex items-center gap-3 shadow-glass neon-glow max-w-md">
+          <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77-1.333.192 3 1.732 3z" />
+          </svg>
+          <div className="flex-1">
+            <p className="text-sm font-semibold tracking-wide mb-1">API Key Missing</p>
+            <p className="text-xs text-white/80">Please configure GEMINI_API_KEY in environment variables</p>
+          </div>
+          <button
+            onClick={() => setApiKeyError(false)}
+            className="p-1 hover:bg-white/10 rounded-full transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Error Notification Toast */}
+      {errorNotification && (
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 liquid-glass-strong border border-[#FF453A]/30 text-white px-6 py-3 rounded-full flex items-center gap-3 shadow-glass neon-glow">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77-1.333.192 3 1.732 3z" />
+          </svg>
+          <span className="text-sm font-semibold tracking-wide">Error Detected! Let's fix that.</span>
+        </div>
+      )}
+
+      {/* Auto-save Toast */}
+      {showAutoSaveToast && (
+        <div className="absolute top-24 right-6 z-50 liquid-glass-strong border border-[#34C759]/30 text-white px-4 py-2 rounded-full flex items-center gap-2 shadow-glass">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="text-xs font-semibold tracking-wide uppercase">Auto-saved</span>
         </div>
       )}
 
@@ -1551,7 +1711,7 @@ Proceed with this browser task now using the browser_control tool and the visibl
           </div>
           <form
             onSubmit={handleSendChat}
-            className="shrink-0 bg-[#1C1C1E]/40 backdrop-blur-2xl rounded-3xl border border-white/10 p-2 flex items-center gap-2 shadow-2xl relative z-10"
+            className="shrink-0 liquid-glass rounded-3xl border border-white/20 p-2 flex items-center gap-2 shadow-glass relative z-10"
           >
             <input
               type="text"
@@ -1564,7 +1724,7 @@ Proceed with this browser task now using the browser_control tool and the visibl
             <button
               type="submit"
               disabled={!chatInput.trim() || status !== SessionStatus.ACTIVE}
-              className="w-10 h-10 rounded-full flex items-center justify-center bg-[#0A84FF] text-white disabled:opacity-50 disabled:bg-white/10 disabled:text-white/40 transition-colors"
+              className="w-10 h-10 rounded-full flex items-center justify-center bg-[#0A84FF] text-white disabled:opacity-50 disabled:bg-white/10 disabled:text-white/40 transition-colors shadow-glass hover:shadow-glass-hover neon-glow-hover"
             >
               <svg className="w-5 h-5 -ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
