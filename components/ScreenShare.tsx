@@ -5,17 +5,30 @@ interface ScreenShareProps {
   videoRef: React.RefObject<HTMLVideoElement>;
   isSharing: boolean;
   onToggle: () => void;
+  isBrowserControlEnabled?: boolean;
 }
 
-export const ScreenShare: React.FC<ScreenShareProps> = ({ videoRef, isSharing, onToggle }) => {
+export const ScreenShare: React.FC<ScreenShareProps> = ({
+  videoRef,
+  isSharing,
+  onToggle,
+  isBrowserControlEnabled = false
+}) => {
   return (
-    <div className={`relative flex-1 backdrop-blur-2xl rounded-[32px] overflow-hidden shadow-2xl group flex flex-col transition-all duration-700 border ${isSharing ? 'bg-black/60 border-[#FF453A]/30 shadow-[0_0_50px_rgba(255,69,58,0.15)]' : 'bg-[#1C1C1E]/40 border-white/10'}`}>
+    <div className={`relative flex-1 backdrop-blur-2xl rounded-[32px] overflow-hidden shadow-2xl group flex flex-col transition-all duration-700 border ${isBrowserControlEnabled ? 'bg-black/60 border-[#0A84FF]/40 shadow-[0_0_60px_rgba(10,132,255,0.22)]' : isSharing ? 'bg-black/60 border-[#FF453A]/30 shadow-[0_0_50px_rgba(255,69,58,0.15)]' : 'bg-[#1C1C1E]/40 border-white/10'}`}>
       <video 
         ref={videoRef} 
         autoPlay 
         playsInline 
         className={`w-full h-full object-contain ${isSharing ? 'opacity-100' : 'opacity-0'} transition-opacity duration-700`} 
       />
+
+      {isSharing && isBrowserControlEnabled && (
+        <>
+          <div className="absolute inset-0 pointer-events-none bg-[#0A84FF]/12 mix-blend-screen" />
+          <div className="absolute inset-0 pointer-events-none ring-1 ring-inset ring-[#64D2FF]/30" />
+        </>
+      )}
       
       {!isSharing && (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-black/20">
@@ -39,7 +52,18 @@ export const ScreenShare: React.FC<ScreenShareProps> = ({ videoRef, isSharing, o
 
       {isSharing && (
         <div className="absolute top-6 right-6 flex gap-3 items-center">
-          <div className="group/live flex items-center gap-2.5 bg-[#FF453A] text-white px-4 py-2 rounded-full shadow-[0_0_25px_rgba(255,69,58,0.5)] relative hover:shadow-[0_0_35px_rgba(255,69,58,0.7)] cursor-default transition-all duration-300 hover:scale-105 border border-white/20">
+          {isBrowserControlEnabled && (
+            <div className="flex items-center gap-2.5 bg-[#0A84FF]/90 text-white px-4 py-2 rounded-full shadow-[0_0_25px_rgba(10,132,255,0.45)] border border-[#64D2FF]/40 backdrop-blur-xl">
+              <svg className="w-4 h-4 text-[#BFECFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3a9 9 0 100 18 9 9 0 000-18z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.6 9h16.8M3.6 15h16.8M12 3c2.1 2.4 3.2 5.4 3.2 9S14.1 18.6 12 21c-2.1-2.4-3.2-5.4-3.2-9S9.9 5.4 12 3z" />
+              </svg>
+              <span className="text-[12px] font-bold uppercase tracking-widest text-white">
+                Browser Control
+              </span>
+            </div>
+          )}
+          <div className={`group/live flex items-center gap-2.5 text-white px-4 py-2 rounded-full relative cursor-default transition-all duration-300 hover:scale-105 border border-white/20 ${isBrowserControlEnabled ? 'bg-[#0A84FF]/70 shadow-[0_0_25px_rgba(10,132,255,0.35)] hover:shadow-[0_0_35px_rgba(10,132,255,0.55)]' : 'bg-[#FF453A] shadow-[0_0_25px_rgba(255,69,58,0.5)] hover:shadow-[0_0_35px_rgba(255,69,58,0.7)]'}`}>
             <div className="relative flex items-center justify-center w-2.5 h-2.5">
               <div className="absolute w-full h-full bg-white rounded-full animate-ping opacity-75" style={{ animationDuration: '1.5s' }} />
               <div className="relative w-2 h-2 bg-white rounded-full" />

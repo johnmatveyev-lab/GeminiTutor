@@ -12,6 +12,9 @@ interface HeaderProps {
   onVoiceSelect: (voice: string) => void;
   shortcutKey: string;
   onShortcutKeyChange: (key: string) => void;
+  isBrowserControlSkillEnabled: boolean;
+  onBrowserControlSkillChange: (enabled: boolean) => void;
+  browserControlBridgeReady: boolean;
 }
 
 const formatTime = (seconds: number) => {
@@ -20,7 +23,19 @@ const formatTime = (seconds: number) => {
   return `${m}:${s}`;
 };
 
-export const Header: React.FC<HeaderProps> = ({ status, selectedTutorId, onTutorSelect, sessionDuration, selectedVoice, onVoiceSelect, shortcutKey, onShortcutKeyChange }) => {
+export const Header: React.FC<HeaderProps> = ({
+  status,
+  selectedTutorId,
+  onTutorSelect,
+  sessionDuration,
+  selectedVoice,
+  onVoiceSelect,
+  shortcutKey,
+  onShortcutKeyChange,
+  isBrowserControlSkillEnabled,
+  onBrowserControlSkillChange,
+  browserControlBridgeReady
+}) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isRecordingKey, setIsRecordingKey] = useState(false);
   const getStatusColor = () => {
@@ -135,6 +150,36 @@ export const Header: React.FC<HeaderProps> = ({ status, selectedTutorId, onTutor
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
+                  </div>
+                </div>
+                <div className="p-4 bg-black/20 border-t border-white/5">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-[13px] font-semibold text-white/90 uppercase tracking-widest mb-1">Browser Control Skill</h3>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${browserControlBridgeReady ? 'bg-[#34C759]' : 'bg-[#FF9F0A]'}`} />
+                        <span className="text-[11px] text-white/50">
+                          {browserControlBridgeReady ? 'Bridge ready' : 'Bridge offline'}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onBrowserControlSkillChange(!isBrowserControlSkillEnabled)}
+                      className={`relative w-12 h-7 rounded-full border transition-colors ${
+                        isBrowserControlSkillEnabled
+                          ? 'bg-[#0A84FF]/80 border-[#64D2FF]/40'
+                          : 'bg-white/10 border-white/10'
+                      }`}
+                      aria-pressed={isBrowserControlSkillEnabled}
+                      title={isBrowserControlSkillEnabled ? 'Disable Browser Control Skill' : 'Enable Browser Control Skill'}
+                    >
+                      <span
+                        className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${
+                          isBrowserControlSkillEnabled ? 'translate-x-5' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
                   </div>
                 </div>
                 <div className="p-4 bg-black/20 border-t border-white/5">

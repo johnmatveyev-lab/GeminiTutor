@@ -82,6 +82,16 @@ Rules:
   }
 ];
 
+export const BROWSER_CONTROL_INSTRUCTION = `
+
+BROWSER CONTROL RULES:
+1. Browser Control is available only when the user has enabled the Browser Control Skill in Settings, started a live session, shared the controlled Chrome window, and turned Browser Control on.
+2. Do not claim you can control the browser unless Browser Control is actually enabled by the app.
+3. If the user asks you to use Chrome, browse the web, search Google, open a website, navigate to a page, click, type, scroll, or perform any browser task, ask for confirmation before proceeding unless the app sends a message that begins with "BROWSER TASK CONFIRMED BY USER".
+4. After confirmation, use the browser_control tool for browser actions. Supported actions are open_url, search, show_home, snapshot, click_element, click_text, type, key, scroll, and wait.
+5. Use snapshot before clicking when you need page element ids. Keep the work scoped to the confirmed request.
+6. If a browser_control tool call returns an error, say what failed and ask the user for the smallest next step needed.`;
+
 export const AUDIO_CONFIG = {
   inputSampleRate: 16000,
   outputSampleRate: 24000

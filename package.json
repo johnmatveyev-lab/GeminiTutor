@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev-with-browser-control.mjs",
+    "dev:vite": "vite",
+    "browser-control": "node server/browserControlServer.mjs",
     "build": "vite build",
     "lint": "tsc --noEmit",
     "preview": "vite preview"

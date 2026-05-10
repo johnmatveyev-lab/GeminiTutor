@@ -10,6 +10,10 @@ interface ControlPanelProps {
   onStop: () => void;
   onToggleScreen: () => void;
   isScreenSharing: boolean;
+  onToggleBrowserControl: () => void;
+  isBrowserControlEnabled: boolean;
+  isBrowserControlSkillEnabled: boolean;
+  isBrowserControlBridgeReady: boolean;
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -19,10 +23,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   onStart,
   onStop,
   onToggleScreen,
-  isScreenSharing
+  isScreenSharing,
+  onToggleBrowserControl,
+  isBrowserControlEnabled,
+  isBrowserControlSkillEnabled,
+  isBrowserControlBridgeReady
 }) => {
   const isActive = status === SessionStatus.ACTIVE;
   const isConnecting = status === SessionStatus.CONNECTING;
+  const canUseBrowserControl = isActive && isBrowserControlSkillEnabled && isBrowserControlBridgeReady;
 
   return (
     <div className="fixed bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 z-50">
@@ -101,6 +110,34 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         >
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </button>
+
+        {/* Browser Control Toggle */}
+        <button
+          onClick={onToggleBrowserControl}
+          disabled={!canUseBrowserControl}
+          className={`w-14 h-14 flex items-center justify-center rounded-full transition-all duration-300 ${
+            isBrowserControlEnabled 
+              ? 'bg-[#0A84FF]/25 text-[#64D2FF] border border-[#64D2FF]/40 shadow-[0_0_24px_rgba(10,132,255,0.35)]' 
+              : 'bg-white/5 text-white/90 hover:bg-white/15 border border-white/5 disabled:opacity-30 disabled:hover:bg-white/5'
+          }`}
+          title={
+            isBrowserControlEnabled
+              ? "Turn Off Browser Control"
+              : !isActive
+                ? "Start Session to Use Browser Control"
+              : !isBrowserControlSkillEnabled
+                ? "Enable Browser Control Skill in Settings"
+                : !isBrowserControlBridgeReady
+                  ? "Browser Control Bridge Offline"
+                  : "Turn On Browser Control"
+          }
+          aria-pressed={isBrowserControlEnabled}
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3a9 9 0 100 18 9 9 0 000-18z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.6 9h16.8M3.6 15h16.8M12 3c2.1 2.4 3.2 5.4 3.2 9S14.1 18.6 12 21c-2.1-2.4-3.2-5.4-3.2-9S9.9 5.4 12 3z" />
           </svg>
         </button>
       </div>
