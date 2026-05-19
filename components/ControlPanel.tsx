@@ -1,5 +1,5 @@
-
 import React from 'react';
+import { cn } from '../lib/utils';
 import { SessionStatus } from '../types';
 
 interface ControlPanelProps {
@@ -34,110 +34,113 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   const canUseBrowserControl = isActive && isBrowserControlSkillEnabled && isBrowserControlBridgeReady;
 
   return (
-    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 z-50">
-      <div className="flex items-center gap-2 text-white/40 text-[10px] uppercase tracking-[0.2em] font-medium glass px-4 py-1.5 rounded-full">
-        <div className="flex items-center gap-1.5">
-          <span className="text-white/60">Double Shift</span>
-          <span>{isActive ? 'End' : 'Start'} Session</span>
-        </div>
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2.5 z-50 px-4 md:px-0 max-w-full">
+      {/* Shortcut hint */}
+      <div className="glass px-3 py-1 rounded-full hidden md:block">
+        <span className="text-[10px] text-white/40 tracking-wide">
+          <span className="text-white/50">Double Shift</span> to {isActive ? 'end' : 'start'}
+        </span>
       </div>
 
-      <div className="flex items-center gap-3 liquid-glass-strong px-4 py-3 rounded-full transition-all duration-500 ease-out hover:scale-105">
-        {/* Mic Button */}
+      {/* Control dock */}
+      <div className="glass-dock flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-full">
+        {/* Mic */}
         <button
           onClick={onToggleMute}
           disabled={!isActive}
-          className={`w-14 h-14 flex items-center justify-center rounded-full transition-all duration-300 ${
+          className={cn(
+            'w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl transition-all duration-200',
             isMuted
-              ? 'bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/30 shadow-glass'
-              : 'bg-white/5 text-white/90 hover:bg-white/15 border border-white/5 disabled:opacity-30 disabled:hover:bg-white/5 shadow-liquid'
-          }`}
-          title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
+              ? 'bg-[var(--color-danger-muted)] text-[var(--color-danger)] border border-[var(--color-danger)]/20'
+              : 'bg-white/5 text-white/80 hover:bg-white/10 border border-white/5 disabled:opacity-25'
+          )}
+          title={isMuted ? "Unmute" : "Mute"}
         >
           {isMuted ? (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M1 1l22 22" />
             </svg>
           ) : (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
             </svg>
           )}
         </button>
 
-        {/* Main Start/Stop Button */}
+        {/* Start / Stop */}
         {isActive ? (
           <button
             onClick={onStop}
-            className="px-8 h-14 bg-[#FF453A] hover:bg-[#FF3B30] text-white rounded-full font-semibold transition-all duration-300 flex items-center gap-3 shadow-glass hover:shadow-glass-hover active:scale-95 text-[13px] uppercase tracking-wider neon-glow-hover"
+            className="px-4 sm:px-6 h-11 sm:h-12 bg-[var(--color-danger)] hover:bg-[var(--color-danger-hover)] text-white rounded-xl font-medium transition-all duration-200 flex items-center gap-2 active:scale-[0.97] text-sm glow-danger"
           >
-            <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse-soft" />
             End Session
           </button>
         ) : (
           <button
             onClick={onStart}
             disabled={isConnecting}
-            className="px-8 h-14 bg-white text-black hover:bg-white/90 disabled:bg-white/20 disabled:text-white/50 rounded-full font-semibold transition-all duration-300 flex items-center gap-2.5 shadow-glass hover:shadow-glass-hover active:scale-95 text-[13px] uppercase tracking-wider"
+            className="px-4 sm:px-6 h-11 sm:h-12 bg-white text-black hover:bg-white/90 disabled:bg-white/15 disabled:text-white/40 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 active:scale-[0.97] text-sm disabled:cursor-not-allowed"
           >
             {isConnecting ? (
               <>
-                <svg className="animate-spin h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 Connecting
               </>
             ) : (
               <>
-                <div className="w-2.5 h-2.5 bg-[#34C759] rounded-full shadow-[0_0_8px_#34C759]" />
+                <div className="w-2 h-2 bg-[var(--color-success)] rounded-full shadow-[0_0_6px_var(--color-success)]" />
                 Start Lesson
               </>
             )}
           </button>
         )}
 
-        {/* Screen Share Toggle */}
+        {/* Screen Share */}
         <button
           onClick={onToggleScreen}
-          className={`w-14 h-14 flex items-center justify-center rounded-full transition-all duration-300 ${
+          className={cn(
+            'w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl transition-all duration-200',
             isScreenSharing
-              ? 'bg-[#0A84FF]/20 text-[#0A84FF] border border-[#0A84FF]/30 shadow-glass neon-glow'
-              : 'bg-white/5 text-white/90 hover:bg-white/15 border border-white/5 shadow-liquid'
-          }`}
+              ? 'bg-[var(--color-primary-muted)] text-[var(--color-primary)] border border-[var(--color-primary)]/20 glow-primary'
+              : 'bg-white/5 text-white/80 hover:bg-white/10 border border-white/5'
+          )}
           title={isScreenSharing ? "Stop Screen Share" : "Start Screen Share"}
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         </button>
 
-        {/* Browser Control Toggle */}
+        {/* Browser Control */}
         <button
           onClick={onToggleBrowserControl}
           disabled={!canUseBrowserControl}
-          className={`w-14 h-14 flex items-center justify-center rounded-full transition-all duration-300 ${
+          className={cn(
+            'w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl transition-all duration-200',
             isBrowserControlEnabled
-              ? 'bg-[#0A84FF]/25 text-[#64D2FF] border border-[#64D2FF]/40 shadow-glass neon-glow'
-              : 'bg-white/5 text-white/90 hover:bg-white/15 border border-white/5 disabled:opacity-30 disabled:hover:bg-white/5 shadow-liquid'
-          }`}
+              ? 'bg-[var(--color-primary-muted)] text-[var(--color-primary-light)] border border-[var(--color-primary-light)]/20 glow-primary'
+              : 'bg-white/5 text-white/80 hover:bg-white/10 border border-white/5 disabled:opacity-25 disabled:hover:bg-white/5'
+          )}
           title={
             isBrowserControlEnabled
               ? "Turn Off Browser Control"
               : !isActive
                 ? "Start Session to Use Browser Control"
-              : !isBrowserControlSkillEnabled
-                ? "Enable Browser Control Skill in Settings"
-                : !isBrowserControlBridgeReady
-                  ? "Browser Control Bridge Offline"
-                  : "Turn On Browser Control"
+                : !isBrowserControlSkillEnabled
+                  ? "Enable Browser Control Skill in Settings"
+                  : !isBrowserControlBridgeReady
+                    ? "Browser Control Bridge Offline"
+                    : "Turn On Browser Control"
           }
           aria-pressed={isBrowserControlEnabled}
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3a9 9 0 100 18 9 9 0 000-18z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.6 9h16.8M3.6 15h16.8M12 3c2.1 2.4 3.2 5.4 3.2 9S14.1 18.6 12 21c-2.1-2.4-3.2-5.4-3.2-9S9.9 5.4 12 3z" />
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
           </svg>
         </button>
       </div>

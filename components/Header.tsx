@@ -1,5 +1,5 @@
-
 import React, { useState } from 'react';
+import { cn } from '../lib/utils';
 import { SessionStatus, TutorType } from '../types';
 import { TUTOR_TYPES, AVAILABLE_VOICES } from '../constants';
 
@@ -38,60 +38,55 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isRecordingKey, setIsRecordingKey] = useState(false);
-  const getStatusColor = () => {
-    switch (status) {
-      case SessionStatus.ACTIVE: return 'bg-[#34C759] shadow-[#34C759]/40';
-      case SessionStatus.CONNECTING: return 'bg-[#FF9F0A] shadow-[#FF9F0A]/40';
-      case SessionStatus.ERROR: return 'bg-[#FF453A] shadow-[#FF453A]/40';
-      default: return 'bg-white/20 shadow-transparent';
-    }
+
+  const statusConfig = {
+    [SessionStatus.ACTIVE]: { color: 'bg-[var(--color-success)]', shadow: 'shadow-[0_0_8px_var(--color-success)]', text: 'Live' },
+    [SessionStatus.CONNECTING]: { color: 'bg-[var(--color-warning)]', shadow: 'shadow-[0_0_8px_var(--color-warning)]', text: 'Connecting' },
+    [SessionStatus.ERROR]: { color: 'bg-[var(--color-danger)]', shadow: 'shadow-[0_0_8px_var(--color-danger)]', text: 'Error' },
+    [SessionStatus.IDLE]: { color: 'bg-white/20', shadow: '', text: 'Offline' },
   };
 
-  const getStatusText = () => {
-    switch (status) {
-      case SessionStatus.ACTIVE: return 'Live Guidance Active';
-      case SessionStatus.CONNECTING: return 'Establishing Link...';
-      case SessionStatus.ERROR: return 'Connection Error';
-      default: return 'Tutor Offline';
-    }
-  };
+  const currentStatus = statusConfig[status] || statusConfig[SessionStatus.IDLE];
 
   return (
-    <header className="mx-auto max-w-4xl px-5 py-3 border border-[#05726e] flex justify-between items-center liquid-glass-strong rounded-full shadow-glass transition-all duration-500 text-[#045846] font-[Georgia]">
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 liquid-glass rounded-full flex items-center justify-center shadow-glass neon-glow">
-          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    <header className="mx-auto max-w-4xl glass-card rounded-2xl px-5 py-3 flex items-center justify-between">
+      {/* Logo & Title */}
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-[var(--color-primary-muted)] flex items-center justify-center">
+          <svg className="w-5 h-5 text-[var(--color-primary-light)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
         </div>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-white mb-0.5">Gemini Tutor</h1>
-          <p className="text-[11px] uppercase tracking-wider text-white/50 font-medium">Real-time Visually Aware AI</p>
+          <h1 className="text-base font-semibold tracking-tight">Gemini Tutor</h1>
+          <p className="text-xs text-white/40">Real-time AI Guidance</p>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      {/* Status & Timer */}
+      <div className="flex items-center gap-3">
         {(status === SessionStatus.ACTIVE || sessionDuration > 0) && (
-          <div className={`font-mono font-medium text-[13px] px-3 py-1 glass rounded-full transition-colors ${status === SessionStatus.ACTIVE ? 'text-white/80' : 'text-white/40'}`}>
+          <span className={cn(
+            'font-mono text-xs px-2.5 py-1 rounded-lg',
+            status === SessionStatus.ACTIVE ? 'text-white/80 glass' : 'text-white/30'
+          )}>
             {formatTime(sessionDuration)}
-          </div>
+          </span>
         )}
 
-        <div className="flex items-center gap-2.5 glass px-4 py-2 rounded-full">
-          <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor()} shadow-md animate-pulse`} />
-          <span className="text-[11px] font-semibold text-white/80 uppercase tracking-widest">
-            {getStatusText()}
-          </span>
+        <div className="flex items-center gap-2 glass px-3 py-1.5 rounded-lg">
+          <div className={cn('w-2 h-2 rounded-full', currentStatus.color, currentStatus.shadow, status === SessionStatus.ACTIVE && 'animate-pulse')} />
+          <span className="text-xs font-medium text-white/60">{currentStatus.text}</span>
         </div>
 
-        {/* Settings Menu */}
+        {/* Settings */}
         <div className="relative">
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="w-10 h-10 flex items-center justify-center rounded-full glass hover:bg-white/10 transition-colors"
+            className="w-9 h-9 flex items-center justify-center rounded-xl glass hover:bg-[var(--glass-bg-hover)] transition-colors duration-150"
             title="Settings"
           >
-            <svg className="w-5 h-5 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
@@ -100,65 +95,64 @@ export const Header: React.FC<HeaderProps> = ({
           {isMenuOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
-              <div className="absolute right-0 top-14 w-72 liquid-glass-strong rounded-2xl shadow-glass z-50 overflow-hidden transform origin-top-right transition-all">
+              <div className="absolute right-0 top-12 w-72 glass-strong rounded-2xl z-50 overflow-hidden animate-scale-in shadow-2xl">
+                {/* Tutor Section */}
                 <div className="p-4 border-b border-white/5">
-                  <h3 className="text-[13px] font-semibold text-white/90 uppercase tracking-widest mb-1">Tutor Personality</h3>
-                  <p className="text-[11px] text-white/50 leading-relaxed">Select the teaching style that works best for you. (Takes effect on next start)</p>
-                </div>
-                <div className="max-h-64 overflow-y-auto custom-scrollbar">
-                  {TUTOR_TYPES.map(tutor => (
-                    <button
-                      key={tutor.id}
-                      onClick={() => {
-                        onTutorSelect(tutor.id);
-                        setIsMenuOpen(false);
-                      }}
-                      className={`w-full text-left p-4 hover:bg-white/5 transition-colors flex flex-col gap-1 border-l-2 ${
-                        selectedTutorId === tutor.id ? 'border-[#0A84FF] bg-white/5' : 'border-transparent'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[14px] font-medium text-white">{tutor.name}</span>
+                  <h3 className="text-xs font-medium text-white/50 mb-1">Tutor Personality</h3>
+                  <p className="text-[10px] text-white/30 leading-relaxed mb-3">Takes effect on next session start</p>
+                  <div className="space-y-1">
+                    {TUTOR_TYPES.map(tutor => (
+                      <button
+                        key={tutor.id}
+                        onClick={() => { onTutorSelect(tutor.id); setIsMenuOpen(false); }}
+                        className={cn(
+                          'w-full text-left px-3 py-2.5 rounded-lg transition-colors duration-150 flex items-center justify-between',
+                          selectedTutorId === tutor.id ? 'bg-[var(--color-primary-muted)] text-white' : 'hover:bg-white/5 text-white/70'
+                        )}
+                      >
+                        <div>
+                          <span className="text-sm font-medium">{tutor.name}</span>
+                          <p className="text-[11px] text-white/40 mt-0.5">{tutor.description}</p>
+                        </div>
                         {selectedTutorId === tutor.id && (
-                          <svg className="w-4 h-4 text-[#0A84FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-4 h-4 text-[var(--color-primary)] shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                         )}
-                      </div>
-                      <span className="text-[12px] text-white/60">{tutor.description}</span>
-                    </button>
-                  ))}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="p-4 glass">
-                  <h3 className="text-[13px] font-semibold text-white/90 uppercase tracking-widest mb-2 flex items-center justify-between">
-                    <span>Voice</span>
-                  </h3>
+
+                {/* Voice Section */}
+                <div className="p-4 border-b border-white/5">
+                  <h3 className="text-xs font-medium text-white/50 mb-2">Voice</h3>
                   <div className="relative">
                     <select
                       value={selectedVoice}
                       onChange={(e) => onVoiceSelect(e.target.value)}
-                      className="w-full appearance-none glass border border-white/10 hover:border-white/20 rounded-xl px-4 py-2.5 text-[14px] font-medium text-white outline-none cursor-pointer transition-colors"
+                      className="w-full appearance-none glass rounded-xl px-3 py-2 text-sm font-medium text-white outline-none cursor-pointer transition-colors hover:bg-[var(--glass-bg-hover)]"
                     >
                       {AVAILABLE_VOICES.map(voice => (
-                        <option key={voice} value={voice} className="bg-[#1C1C1E] text-white">
-                          {voice}
-                        </option>
+                        <option key={voice} value={voice} className="bg-[var(--color-surface)] text-white">{voice}</option>
                       ))}
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="w-4 h-4 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-3.5 h-3.5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
                   </div>
                 </div>
-                <div className="p-4 glass border-t border-white/5">
+
+                {/* Browser Control Skill */}
+                <div className="p-4 border-b border-white/5">
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <h3 className="text-[13px] font-semibold text-white/90 uppercase tracking-widest mb-1">Browser Control Skill</h3>
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${browserControlBridgeReady ? 'bg-[#34C759]' : 'bg-[#FF9F0A]'}`} />
-                        <span className="text-[11px] text-white/50">
+                      <h3 className="text-xs font-medium text-white/50 mb-1">Browser Control Skill</h3>
+                      <div className="flex items-center gap-1.5">
+                        <span className={cn('w-1.5 h-1.5 rounded-full', browserControlBridgeReady ? 'bg-[var(--color-success)]' : 'bg-[var(--color-warning)]')} />
+                        <span className="text-[10px] text-white/30">
                           {browserControlBridgeReady ? 'Bridge ready' : 'Bridge offline'}
                         </span>
                       </div>
@@ -166,31 +160,29 @@ export const Header: React.FC<HeaderProps> = ({
                     <button
                       type="button"
                       onClick={() => onBrowserControlSkillChange(!isBrowserControlSkillEnabled)}
-                      className={`relative w-12 h-7 rounded-full border transition-colors ${
+                      className={cn(
+                        'relative w-11 h-6 rounded-full transition-colors duration-200',
                         isBrowserControlSkillEnabled
-                          ? 'bg-[#0A84FF]/80 border-[#64D2FF]/40 neon-glow'
-                          : 'glass border-white/10'
-                      }`}
+                          ? 'bg-[var(--color-primary)] glow-primary'
+                          : 'bg-white/10'
+                      )}
                       aria-pressed={isBrowserControlSkillEnabled}
-                      title={isBrowserControlSkillEnabled ? 'Disable Browser Control Skill' : 'Enable Browser Control Skill'}
                     >
                       <span
-                        className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${
-                          isBrowserControlSkillEnabled ? 'translate-x-5' : 'translate-x-1'
-                        }`}
+                        className={cn(
+                          'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-200',
+                          isBrowserControlSkillEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+                        )}
                       />
                     </button>
                   </div>
                 </div>
-                <div className="p-4 glass border-t border-white/5">
-                  <h3 className="text-[13px] font-semibold text-white/90 uppercase tracking-widest mb-2 flex items-center justify-between">
-                    <span>Quick Start Shortcut</span>
-                  </h3>
+
+                {/* Shortcut Key */}
+                <div className="p-4">
+                  <h3 className="text-xs font-medium text-white/50 mb-2">Quick Start Shortcut</h3>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsRecordingKey(true);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); setIsRecordingKey(true); }}
                     onKeyDown={(e) => {
                       if (isRecordingKey) {
                         e.preventDefault();
@@ -200,11 +192,16 @@ export const Header: React.FC<HeaderProps> = ({
                       }
                     }}
                     onBlur={() => setIsRecordingKey(false)}
-                    className={`w-full text-left glass border ${isRecordingKey ? 'border-[#0A84FF] ring-2 ring-[#0A84FF]/50 neon-glow' : 'border-white/10 hover:border-white/20'} rounded-xl px-4 py-2.5 text-[14px] font-medium text-white transition-colors flex justify-between items-center`}
+                    className={cn(
+                      'w-full text-left glass rounded-xl px-3 py-2 text-sm font-medium text-white transition-all duration-150 flex justify-between items-center',
+                      isRecordingKey
+                        ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/30 glow-primary'
+                        : 'hover:bg-[var(--glass-bg-hover)]'
+                    )}
                   >
                     <span>{isRecordingKey ? 'Press any key...' : shortcutKey || 'None'}</span>
                     {!isRecordingKey && (
-                      <span className="text-[10px] uppercase text-white/50 glass px-2 py-1 rounded">Edit</span>
+                      <span className="text-[10px] text-white/30 glass px-1.5 py-0.5 rounded">Edit</span>
                     )}
                   </button>
                 </div>
