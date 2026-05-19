@@ -67,15 +67,23 @@ const isDevToolsReady = async () => {
 const launchChrome = async () => {
   if (!existsSync(PROFILE_DIR)) mkdirSync(PROFILE_DIR, { recursive: true });
 
-  if (!chromeProcess || chromeProcess.killed) {
+  if (!chromeProcess || chromeProcess.killed || chromeProcess.exitCode !== null) {
     chromeProcess = spawn(findChrome(), [
       `--remote-debugging-port=${DEBUG_PORT}`,
+      '--remote-debugging-address=127.0.0.1',
       `--user-data-dir=${PROFILE_DIR}`,
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-background-networking',
+      '--disable-sync',
       '--new-window',
-      'about:blank'
+      'https://www.google.com'
     ], {
       detached: true,
       stdio: 'ignore'
+    });
+    chromeProcess.on('exit', () => {
+      chromeProcess = null;
     });
     chromeProcess.unref();
   }
@@ -85,6 +93,10 @@ const launchChrome = async () => {
     await wait(100);
   }
 
+  try {
+    chromeProcess?.kill('SIGKILL');
+  } catch { }
+  chromeProcess = null;
   throw new Error('Timed out waiting for Chrome DevTools to become available.');
 };
 
@@ -327,10 +339,11 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (req.method === 'GET' && req.url === '/status') {
+      const chromeDevToolsReady = await isDevToolsReady();
       json(res, 200, {
         ok: true,
         bridge: 'ready',
-        chromeDevToolsReady: await isDevToolsReady(),
+        chromeDevToolsReady,
         debugPort: DEBUG_PORT,
         supportedActions: ['open_url', 'search', 'show_home', 'snapshot', 'click_element', 'click_text', 'type', 'key', 'scroll', 'wait']
       });
@@ -352,4 +365,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`Browser Control bridge ready at http://${HOST}:${PORT}`);
+  void launchChrome().catch((error) => {
+    console.warn('Browser Control bridge could not pre-launch Chrome:', error?.message || error);
+  });
 });

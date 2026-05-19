@@ -37,6 +37,7 @@ import {
 
 const GOOGLE_HOME_URL = 'https://www.google.com';
 const BROWSER_CONTROL_BRIDGE_URL = 'http://127.0.0.1:8787';
+const isE2EMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e');
 
 const URL_PATTERN = /((?:https?:\/\/)?(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+)/i;
 const BROWSER_CONTEXT_PATTERN = /\b(browser|chrome|google|web|website|internet|online|site|url|page)\b/i;
@@ -596,6 +597,24 @@ const App: React.FC = () => {
     setStatus(SessionStatus.IDLE);
   }, []);
 
+  const resetTestState = useCallback(() => {
+    localStorage.removeItem('selected_tutor_id');
+    localStorage.removeItem('selected_voice');
+    localStorage.removeItem('shortcut_key');
+    localStorage.removeItem('browser_control_skill_enabled');
+    localStorage.removeItem('gemini_tutor_sessions');
+    setSelectedTutorId(TUTOR_TYPES[0].id);
+    setSelectedVoice('Puck');
+    setShortcutKey('F1');
+    setIsBrowserControlSkillEnabled(false);
+    setIsBrowserControlEnabled(false);
+    setPendingBrowserTask(null);
+    setBrowserControlError(null);
+    setCurrentSessionId(null);
+    setSessions([]);
+    setSessionDuration(0);
+  }, []);
+
   const [errorNotification, setErrorNotification] = useState(false);
   const [apiKeyError, setApiKeyError] = useState(false);
   const [sessionSwitchWarning, setSessionSwitchWarning] = useState(false);
@@ -667,6 +686,10 @@ const App: React.FC = () => {
   }, [isBrowserControlSkillEnabled, isScreenSharing, status]);
 
   const checkBrowserControlBridge = useCallback(async () => {
+    if (isE2EMode) {
+      setBrowserControlBridgeReady(true);
+      return true;
+    }
     try {
       const response = await fetch(`${BROWSER_CONTROL_BRIDGE_URL}/status`);
       const result = await response.json();
@@ -731,6 +754,21 @@ const App: React.FC = () => {
     });
   }, [updateCurrentSession]);
 
+  const addModelTranscription = useCallback((text: string, suffix = 'model-text') => {
+    if (!currentSessionIdRef.current) return;
+    const currentSession = sessionsRef.current.find(s => s.id === currentSessionIdRef.current);
+    if (!currentSession) return;
+    const newTranscription: Transcription = {
+      id: `${Date.now()}-${suffix}`,
+      role: 'model',
+      text,
+      timestamp: Date.now()
+    };
+    updateCurrentSession({
+      transcriptions: [...currentSession.transcriptions, newTranscription]
+    });
+  }, [updateCurrentSession]);
+
   const toggleBrowserControl = useCallback(() => {
     void (async () => {
       if (isBrowserControlEnabled) {
@@ -739,6 +777,11 @@ const App: React.FC = () => {
         return;
       }
       if (!ensureBrowserControlPrerequisites(false)) return;
+      if (isE2EMode) {
+        setIsBrowserControlEnabled(true);
+        setBrowserControlError(null);
+        return;
+      }
       const bridgeReady = await checkBrowserControlBridge();
       if (!bridgeReady) {
         setBrowserControlError('Browser Control bridge is not running. Restart with npm run dev so the local Chrome bridge starts.');
@@ -794,10 +837,16 @@ const App: React.FC = () => {
         return { id: call.id, name: responseName, response: { error: 'Browser Control is not active. Ask the user to enable the Browser Control Skill in Settings, start a session, share the controlled Chrome window, and confirm the browser task.' } };
       }
       const result = await runBrowserControlBridgeAction(call.args || {});
+      if (result.ok) {
+        const outputText = typeof result.output === 'object' && result.output !== null
+          ? JSON.stringify(result.output)
+          : String(result.output ?? 'completed');
+        addModelTranscription(`Browser action completed: ${outputText}`, 'browser-action');
+      }
       return { id: call.id, name: responseName, response: result.ok ? { output: result.output } : { error: result.error || 'Browser Control bridge action failed.' } };
     }));
     sessionRef.current?.sendToolResponse({ functionResponses });
-  }, [runBrowserControlBridgeAction]);
+  }, [addModelTranscription, runBrowserControlBridgeAction]);
 
   const handleMessage = async (message: LiveServerMessage) => {
     if (message.toolCall?.functionCalls?.length) {
@@ -865,6 +914,19 @@ const App: React.FC = () => {
 
   const startSession = async () => {
     try {
+      if (isE2EMode) {
+        setStatus(SessionStatus.ACTIVE);
+        setSessionDuration(0);
+        setConnectionError(null);
+        if (!currentSessionIdRef.current) createNewSession();
+        sessionRef.current = {
+          send: () => undefined,
+          sendRealtimeInput: () => undefined,
+          sendToolResponse: () => undefined,
+          close: () => undefined
+        };
+        return;
+      }
       const browserInfo = getBrowserInfo();
       if (!browserInfo.supportsWebAudio) {
         setConnectionError('Your browser doesn\'t support Web Audio API. Please use a modern browser like Chrome, Firefox, Safari, or Edge.');
@@ -1001,6 +1063,11 @@ const App: React.FC = () => {
     }
 
     try {
+      if (isE2EMode) {
+        setIsScreenSharing(true);
+        setScreenShareError(null);
+        return;
+      }
       if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
         throw new Error('Screen sharing is not supported in your browser');
       }
@@ -1137,12 +1204,14 @@ const App: React.FC = () => {
             <div className="flex gap-3">
               <button
                 onClick={cancelBrowserTask}
+                data-testid="browser-task-cancel"
                 className="flex-1 px-4 py-2.5 glass hover:bg-[var(--glass-bg-hover)] rounded-xl font-medium transition-colors duration-150"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmBrowserTask}
+                data-testid="browser-task-confirm"
                 className="flex-1 px-4 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white rounded-xl font-medium transition-colors duration-150 glow-primary"
               >
                 Confirm
@@ -1192,7 +1261,7 @@ const App: React.FC = () => {
       {/* === MAIN LAYOUT === */}
       <div className="relative z-10 flex flex-col h-full">
         <div className="shrink-0 px-5 pt-5 pb-3">
-          <Header
+        <Header
             status={status}
             selectedTutorId={selectedTutorId}
             onTutorSelect={setSelectedTutorId}
@@ -1202,9 +1271,10 @@ const App: React.FC = () => {
             shortcutKey={shortcutKey}
             onShortcutKeyChange={setShortcutKey}
             isBrowserControlSkillEnabled={isBrowserControlSkillEnabled}
-            onBrowserControlSkillChange={setIsBrowserControlSkillEnabled}
-            browserControlBridgeReady={browserControlBridgeReady}
-          />
+          onBrowserControlSkillChange={setIsBrowserControlSkillEnabled}
+          browserControlBridgeReady={browserControlBridgeReady}
+          onResetTestState={resetTestState}
+        />
         </div>
 
         <main className="flex-1 flex flex-col md:flex-row overflow-hidden px-4 md:px-5 pb-24 md:pb-28 gap-3 md:gap-4 max-w-6xl mx-auto w-full">
@@ -1258,6 +1328,7 @@ const App: React.FC = () => {
               />
               <button
                 type="submit"
+                data-testid="chat-send"
                 disabled={!chatInput.trim() || status !== SessionStatus.ACTIVE}
                 className={cn(
                   'w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150 shrink-0',

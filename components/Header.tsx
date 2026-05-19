@@ -15,6 +15,7 @@ interface HeaderProps {
   isBrowserControlSkillEnabled: boolean;
   onBrowserControlSkillChange: (enabled: boolean) => void;
   browserControlBridgeReady: boolean;
+  onResetTestState: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -34,7 +35,8 @@ export const Header: React.FC<HeaderProps> = ({
   onShortcutKeyChange,
   isBrowserControlSkillEnabled,
   onBrowserControlSkillChange,
-  browserControlBridgeReady
+  browserControlBridgeReady,
+  onResetTestState
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isRecordingKey, setIsRecordingKey] = useState(false);
@@ -82,6 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Settings */}
         <div className="relative">
           <button
+            data-testid="settings-button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="w-9 h-9 flex items-center justify-center rounded-xl glass hover:bg-[var(--glass-bg-hover)] transition-colors duration-150"
             title="Settings"
@@ -159,6 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                     <button
                       type="button"
+                      data-testid="browser-skill-toggle"
                       onClick={() => onBrowserControlSkillChange(!isBrowserControlSkillEnabled)}
                       className={cn(
                         'relative w-11 h-6 rounded-full transition-colors duration-200',
@@ -203,6 +207,13 @@ export const Header: React.FC<HeaderProps> = ({
                     {!isRecordingKey && (
                       <span className="text-[10px] text-white/30 glass px-1.5 py-0.5 rounded">Edit</span>
                     )}
+                  </button>
+                  <button
+                    data-testid="reset-test-state"
+                    onClick={() => { onResetTestState(); setIsMenuOpen(false); }}
+                    className="w-full mt-3 text-left glass rounded-xl px-3 py-2 text-sm font-medium text-white/80 transition-all duration-150 hover:bg-[var(--glass-bg-hover)]"
+                  >
+                    Reset Test State
                   </button>
                 </div>
               </div>

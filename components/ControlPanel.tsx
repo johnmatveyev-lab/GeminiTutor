@@ -47,6 +47,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* Mic */}
         <button
           onClick={onToggleMute}
+          data-testid="mute-toggle"
           disabled={!isActive}
           className={cn(
             'w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl transition-all duration-200',
@@ -72,6 +73,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         {isActive ? (
           <button
             onClick={onStop}
+            data-testid="end-session"
             className="px-4 sm:px-6 h-11 sm:h-12 bg-[var(--color-danger)] hover:bg-[var(--color-danger-hover)] text-white rounded-xl font-medium transition-all duration-200 flex items-center gap-2 active:scale-[0.97] text-sm glow-danger"
           >
             <div className="w-2 h-2 bg-white rounded-full animate-pulse-soft" />
@@ -80,6 +82,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         ) : (
           <button
             onClick={onStart}
+            data-testid="start-session"
             disabled={isConnecting}
             className="px-4 sm:px-6 h-11 sm:h-12 bg-white text-black hover:bg-white/90 disabled:bg-white/15 disabled:text-white/40 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 active:scale-[0.97] text-sm disabled:cursor-not-allowed"
           >
@@ -103,6 +106,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* Screen Share */}
         <button
           onClick={onToggleScreen}
+          data-testid="screen-share-toggle"
           className={cn(
             'w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl transition-all duration-200',
             isScreenSharing
@@ -119,6 +123,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* Browser Control */}
         <button
           onClick={onToggleBrowserControl}
+          data-testid="browser-control-toggle"
           disabled={!canUseBrowserControl}
           className={cn(
             'w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl transition-all duration-200',
