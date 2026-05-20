@@ -9,6 +9,7 @@ import { ControlPanel } from './components/ControlPanel';
 import {
   MODEL_NAME,
   TUTOR_TYPES,
+  AI_INTERVIEW_LEVELS,
   AUDIO_CONFIG,
   FRAME_RATE,
   JPEG_QUALITY,
@@ -194,6 +195,10 @@ const Toast: React.FC<{
 };
 
 const App: React.FC = () => {
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const storedTheme = localStorage.getItem('theme_preference');
+    return storedTheme === 'light' ? 'light' : 'dark';
+  });
   const [status, setStatus] = useState<SessionStatus>(SessionStatus.IDLE);
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     return loadSessions();
@@ -216,6 +221,9 @@ const App: React.FC = () => {
   const [shortcutKey, setShortcutKey] = useState(() => {
     return localStorage.getItem('shortcut_key') || 'F1';
   });
+  const [interviewLevel, setInterviewLevel] = useState(() => {
+    return localStorage.getItem('ai_interview_level') || 'mid';
+  });
 
   const [isBrowserControlSkillEnabled, setIsBrowserControlSkillEnabled] = useState(() => {
     return localStorage.getItem('browser_control_skill_enabled') === 'true';
@@ -228,7 +236,12 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem('selected_tutor_id', selectedTutorId); }, [selectedTutorId]);
   useEffect(() => { localStorage.setItem('selected_voice', selectedVoice); }, [selectedVoice]);
   useEffect(() => { localStorage.setItem('shortcut_key', shortcutKey); }, [shortcutKey]);
+  useEffect(() => { localStorage.setItem('ai_interview_level', interviewLevel); }, [interviewLevel]);
   useEffect(() => { localStorage.setItem('browser_control_skill_enabled', String(isBrowserControlSkillEnabled)); }, [isBrowserControlSkillEnabled]);
+  useEffect(() => {
+    localStorage.setItem('theme_preference', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
   useEffect(() => { saveCurrentSessionId(currentSessionId); }, [currentSessionId]);
 
   const transcriptionsRef = useRef(transcriptions);
@@ -453,12 +466,11 @@ const App: React.FC = () => {
       return;
     }
 
-    sessionRef.current.send({
-      clientContent: {
-        turns: [{ role: 'user', parts: [{ text }] }],
-        turnComplete: true
-      }
-    });
+    const sent = sendClientTurn(text);
+    if (!sent) {
+      setConnectionError('Message could not be sent. Please restart the session and try again.');
+      return;
+    }
 
     const currentSessionData = sessionsRef.current.find(s => s.id === currentSessionId);
     const newTranscription: Transcription = {
@@ -503,6 +515,9 @@ const App: React.FC = () => {
   const isBrowserControlSkillEnabledRef = useRef(isBrowserControlSkillEnabled);
   const lastShiftTimeRef = useRef<number>(0);
   const micStreamRef = useRef<MediaStream | null>(null);
+  const retryTimeoutRef = useRef<number | null>(null);
+  const manualSessionStopRef = useRef(false);
+  const isStoppingSessionRef = useRef(false);
 
   statusRef.current = status;
   isScreenSharingRef.current = isScreenSharing;
@@ -556,6 +571,14 @@ const App: React.FC = () => {
   const selectedTutor = TUTOR_TYPES.find(t => t.id === selectedTutorId) || TUTOR_TYPES[0];
 
   const stopSession = useCallback(() => {
+    if (isStoppingSessionRef.current) return;
+    isStoppingSessionRef.current = true;
+    manualSessionStopRef.current = true;
+    if (retryTimeoutRef.current) {
+      window.clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+
     audioSourcesRef.current.forEach(source => {
       try { source.stop(); source.disconnect(); } catch (e) { console.warn('Error stopping audio source:', e); }
     });
@@ -595,18 +618,24 @@ const App: React.FC = () => {
     setIsBrowserControlEnabled(false);
     setPendingBrowserTask(null);
     setStatus(SessionStatus.IDLE);
+    setRetryCount(0);
+    isStoppingSessionRef.current = false;
   }, []);
 
   const resetTestState = useCallback(() => {
     localStorage.removeItem('selected_tutor_id');
     localStorage.removeItem('selected_voice');
     localStorage.removeItem('shortcut_key');
+    localStorage.removeItem('ai_interview_level');
     localStorage.removeItem('browser_control_skill_enabled');
+    localStorage.removeItem('theme_preference');
     localStorage.removeItem('gemini_tutor_sessions');
     setSelectedTutorId(TUTOR_TYPES[0].id);
     setSelectedVoice('Puck');
     setShortcutKey('F1');
+    setInterviewLevel('mid');
     setIsBrowserControlSkillEnabled(false);
+    setTheme('dark');
     setIsBrowserControlEnabled(false);
     setPendingBrowserTask(null);
     setBrowserControlError(null);
@@ -733,11 +762,34 @@ const App: React.FC = () => {
     return () => window.clearInterval(interval);
   }, [checkBrowserControlBridge]);
 
-  const sendSessionText = useCallback((text: string) => {
-    sessionRef.current?.send({
+  const sendClientTurn = useCallback((text: string) => {
+    const session = sessionRef.current;
+    if (!session) return false;
+
+    const payload = {
       clientContent: { turns: [{ role: 'user', parts: [{ text }] }], turnComplete: true }
-    });
+    };
+
+    try {
+      if (typeof session.send === 'function') {
+        session.send(payload);
+        return true;
+      }
+      if (typeof session.sendClientContent === 'function') {
+        session.sendClientContent(payload.clientContent);
+        return true;
+      }
+      console.error('Session does not expose a supported text send method.', Object.keys(session || {}));
+      return false;
+    } catch (error) {
+      console.error('Failed to send client turn:', error);
+      return false;
+    }
   }, []);
+
+  const sendSessionText = useCallback((text: string) => {
+    return sendClientTurn(text);
+  }, [sendClientTurn]);
 
   const addUserTranscription = useCallback((text: string, suffix = 'user-text') => {
     if (!currentSessionIdRef.current) return;
@@ -914,6 +966,11 @@ const App: React.FC = () => {
 
   const startSession = async () => {
     try {
+      manualSessionStopRef.current = false;
+      if (retryTimeoutRef.current) {
+        window.clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
       if (isE2EMode) {
         setStatus(SessionStatus.ACTIVE);
         setSessionDuration(0);
@@ -980,7 +1037,11 @@ const App: React.FC = () => {
         ? `\n\nPREVIOUS CONVERSATION HISTORY:\n${currentSessionData.transcriptions.slice(-20).map(t => `${t.role === 'user' ? 'User' : 'Tutor'}: ${t.text}`).join('\n')}`
         : '';
       const baseInstruction = selectedTutor?.systemInstruction || TUTOR_TYPES[0].systemInstruction;
-      const systemInstruction = baseInstruction + BROWSER_CONTROL_INSTRUCTION + historyContext + `\n\nCRITICAL INSTRUCTION: If you detect the user made a mistake in their coding or input based on their speech or screen share, you MUST start your spoken response with the exact uppercase string "[ERROR]". This will trigger the UI to highlight the error.`;
+      const selectedInterviewLevel = AI_INTERVIEW_LEVELS.find(level => level.id === interviewLevel) || AI_INTERVIEW_LEVELS[1];
+      const interviewLevelInstruction = selectedTutorIdRef.current === 'ai-interviewer'
+        ? `\n\nINTERVIEW LEVEL:\n- Level: ${selectedInterviewLevel.label}\n- Difficulty guidance: ${selectedInterviewLevel.difficultyGuidance}\n\nINTERVIEW WRAP-UP REQUIREMENTS:\nAt the end of the interview, provide a detailed breakdown with these exact sections:\n1) Interview Overview\n2) Key Points Observed\n3) Category Scores (AI Dev, AI Systems, Frontend, Backend, AI Product/Design) each from 1-10\n4) Overall Score (0-100)\n5) Strengths\n6) Gaps and Risks\n7) Actionable Suggestions for Improvement (prioritized)\n8) Hiring Signal (Strong Yes / Yes / Mixed / No)\nAlso include a short final summary paragraph.`
+        : '';
+      const systemInstruction = baseInstruction + interviewLevelInstruction + BROWSER_CONTROL_INSTRUCTION + historyContext + `\n\nCRITICAL INSTRUCTION: If you detect the user made a mistake in their coding or input based on their speech or screen share, you MUST start your spoken response with the exact uppercase string "[ERROR]". This will trigger the UI to highlight the error.`;
 
       const sessionPromise = ai.live.connect({
         model: MODEL_NAME,
@@ -1010,22 +1071,35 @@ const App: React.FC = () => {
           },
           onmessage: handleMessage,
           onerror: (err) => {
+            if (manualSessionStopRef.current) return;
             console.error('Session error:', err);
             setStatus(SessionStatus.ERROR);
             const maxRetries = 3;
             if (retryCount < maxRetries) {
               const backoffDelay = Math.min(1000 * Math.pow(2, retryCount), 10000);
               setConnectionError(`Connection failed. Retrying in ${backoffDelay / 1000} seconds... (${retryCount + 1}/${maxRetries})`);
-              setTimeout(() => { setRetryCount(prev => prev + 1); startSession(); }, backoffDelay);
+              retryTimeoutRef.current = window.setTimeout(() => {
+                if (manualSessionStopRef.current) return;
+                setRetryCount(prev => prev + 1);
+                void startSession();
+              }, backoffDelay);
             } else {
               setConnectionError('Failed to connect after multiple attempts. Please check your internet connection and try again.');
             }
           },
-          onclose: () => { console.log('Session closed'); stopSession(); }
+          onclose: () => {
+            console.log('Session closed');
+            if (manualSessionStopRef.current) return;
+            stopSession();
+          }
         }
       });
 
       sessionRef.current = await sessionPromise;
+
+      if (selectedTutorIdRef.current === 'ai-interviewer' && sessionRef.current) {
+        sendSessionText('Begin the mock interview now. Introduce yourself, explain the interview topics, then start with the first interview question.');
+      }
     } catch (err) {
       console.error('Failed to start session:', err);
       setStatus(SessionStatus.ERROR);
@@ -1170,7 +1244,7 @@ const App: React.FC = () => {
   const anyToastVisible = connectionError || screenShareError || browserControlError || apiKeyError || errorNotification || showAutoSaveToast;
 
   return (
-    <div className="flex flex-col h-screen bg-transparent text-white overflow-hidden relative">
+    <div className="flex flex-col h-screen bg-transparent text-[var(--color-text-primary)] overflow-hidden relative">
       {/* === TOAST NOTIFICATIONS (consolidated, single instance each) === */}
       {anyToastVisible && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-3">
@@ -1274,6 +1348,10 @@ const App: React.FC = () => {
           onBrowserControlSkillChange={setIsBrowserControlSkillEnabled}
           browserControlBridgeReady={browserControlBridgeReady}
           onResetTestState={resetTestState}
+          theme={theme}
+          onThemeChange={setTheme}
+          interviewLevel={interviewLevel}
+          onInterviewLevelChange={setInterviewLevel}
         />
         </div>
 

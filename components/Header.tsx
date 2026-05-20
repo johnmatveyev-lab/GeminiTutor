@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { cn } from '../lib/utils';
 import { SessionStatus, TutorType } from '../types';
-import { TUTOR_TYPES, AVAILABLE_VOICES } from '../constants';
+import { TUTOR_TYPES, AVAILABLE_VOICES, AI_INTERVIEW_LEVELS } from '../constants';
 
 interface HeaderProps {
   status: SessionStatus;
@@ -16,6 +16,10 @@ interface HeaderProps {
   onBrowserControlSkillChange: (enabled: boolean) => void;
   browserControlBridgeReady: boolean;
   onResetTestState: () => void;
+  theme: 'dark' | 'light';
+  onThemeChange: (theme: 'dark' | 'light') => void;
+  interviewLevel: string;
+  onInterviewLevelChange: (level: string) => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -36,7 +40,11 @@ export const Header: React.FC<HeaderProps> = ({
   isBrowserControlSkillEnabled,
   onBrowserControlSkillChange,
   browserControlBridgeReady,
-  onResetTestState
+  onResetTestState,
+  theme,
+  onThemeChange,
+  interviewLevel,
+  onInterviewLevelChange
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isRecordingKey, setIsRecordingKey] = useState(false);
@@ -51,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
   const currentStatus = statusConfig[status] || statusConfig[SessionStatus.IDLE];
 
   return (
-    <header className="mx-auto max-w-4xl glass-card rounded-2xl px-5 py-3 flex items-center justify-between">
+    <header className="relative z-[120] mx-auto max-w-4xl glass-card rounded-2xl px-5 py-3 flex items-center justify-between">
       {/* Logo & Title */}
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-xl bg-[var(--color-primary-muted)] flex items-center justify-center">
@@ -82,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Settings */}
-        <div className="relative">
+        <div className="relative z-[130]">
           <button
             data-testid="settings-button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -97,33 +105,39 @@ export const Header: React.FC<HeaderProps> = ({
 
           {isMenuOpen && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
-              <div className="absolute right-0 top-12 w-72 glass-strong rounded-2xl z-50 overflow-hidden animate-scale-in shadow-2xl">
+              <div className="fixed inset-0 z-[140]" onClick={() => setIsMenuOpen(false)} />
+              <div className={cn(
+                'absolute right-0 top-12 w-72 rounded-2xl z-[150] overflow-hidden animate-scale-in shadow-2xl',
+                theme === 'light'
+                  ? 'bg-white/90 border border-slate-300/80'
+                  : 'bg-[#111318] border border-white/15'
+              )}>
                 {/* Tutor Section */}
                 <div className="p-4 border-b border-white/5">
                   <h3 className="text-xs font-medium text-white/50 mb-1">Tutor Personality</h3>
                   <p className="text-[10px] text-white/30 leading-relaxed mb-3">Takes effect on next session start</p>
-                  <div className="space-y-1">
-                    {TUTOR_TYPES.map(tutor => (
-                      <button
-                        key={tutor.id}
-                        onClick={() => { onTutorSelect(tutor.id); setIsMenuOpen(false); }}
-                        className={cn(
-                          'w-full text-left px-3 py-2.5 rounded-lg transition-colors duration-150 flex items-center justify-between',
-                          selectedTutorId === tutor.id ? 'bg-[var(--color-primary-muted)] text-white' : 'hover:bg-white/5 text-white/70'
-                        )}
-                      >
-                        <div>
-                          <span className="text-sm font-medium">{tutor.name}</span>
-                          <p className="text-[11px] text-white/40 mt-0.5">{tutor.description}</p>
-                        </div>
-                        {selectedTutorId === tutor.id && (
-                          <svg className="w-4 h-4 text-[var(--color-primary)] shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </button>
-                    ))}
+                  <div className="relative">
+                    <select
+                      value={selectedTutorId}
+                      onChange={(e) => onTutorSelect(e.target.value)}
+                      className="w-full appearance-none glass rounded-xl px-3 py-2 text-sm font-medium text-white outline-none cursor-pointer transition-colors hover:bg-[var(--glass-bg-hover)]"
+                    >
+                      {TUTOR_TYPES.map(tutor => (
+                        <option key={tutor.id} value={tutor.id} className="bg-[var(--color-surface)] text-white">
+                          {tutor.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="w-3.5 h-3.5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="mt-2 px-3 py-2 glass rounded-xl">
+                    <p className="text-[11px] text-white/60">
+                      {(TUTOR_TYPES.find(t => t.id === selectedTutorId) || TUTOR_TYPES[0]).description}
+                    </p>
                   </div>
                 </div>
 
@@ -148,6 +162,57 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                 </div>
 
+                {/* Theme Section */}
+                <div className="p-4 border-b border-white/5">
+                  <h3 className="text-xs font-medium text-white/50 mb-2">Appearance</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onThemeChange('dark')}
+                      className={cn(
+                        'px-3 py-2 rounded-xl text-sm font-medium transition-colors duration-150',
+                        theme === 'dark' ? 'bg-[var(--color-primary)] text-white' : 'glass text-white/70 hover:bg-[var(--glass-bg-hover)]'
+                      )}
+                    >
+                      Dark
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onThemeChange('light')}
+                      className={cn(
+                        'px-3 py-2 rounded-xl text-sm font-medium transition-colors duration-150',
+                        theme === 'light' ? 'bg-[var(--color-primary)] text-white' : 'glass text-white/70 hover:bg-[var(--glass-bg-hover)]'
+                      )}
+                    >
+                      Light
+                    </button>
+                  </div>
+                </div>
+
+                {selectedTutorId === 'ai-interviewer' && (
+                  <div className="p-4 border-b border-white/5">
+                    <h3 className="text-xs font-medium text-white/50 mb-2">Interview Level</h3>
+                    <div className="relative">
+                      <select
+                        value={interviewLevel}
+                        onChange={(e) => onInterviewLevelChange(e.target.value)}
+                        className="w-full appearance-none glass rounded-xl px-3 py-2 text-sm font-medium text-white outline-none cursor-pointer transition-colors hover:bg-[var(--glass-bg-hover)]"
+                      >
+                        {AI_INTERVIEW_LEVELS.map(level => (
+                          <option key={level.id} value={level.id} className="bg-[var(--color-surface)] text-white">
+                            {level.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <svg className="w-3.5 h-3.5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Browser Control Skill */}
                 <div className="p-4 border-b border-white/5">
                   <div className="flex items-center justify-between gap-4">
@@ -165,16 +230,16 @@ export const Header: React.FC<HeaderProps> = ({
                       data-testid="browser-skill-toggle"
                       onClick={() => onBrowserControlSkillChange(!isBrowserControlSkillEnabled)}
                       className={cn(
-                        'relative w-11 h-6 rounded-full transition-colors duration-200',
+                        'relative w-11 h-6 rounded-full border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/40',
                         isBrowserControlSkillEnabled
-                          ? 'bg-[var(--color-primary)] glow-primary'
-                          : 'bg-white/10'
+                          ? 'bg-[var(--color-primary)] border-[var(--color-primary-light)]/40 glow-primary'
+                          : 'bg-white/10 border-white/20'
                       )}
                       aria-pressed={isBrowserControlSkillEnabled}
                     >
                       <span
                         className={cn(
-                          'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-200',
+                          'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-[0_1px_6px_rgba(0,0,0,0.35)] transition-transform duration-200',
                           isBrowserControlSkillEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
                         )}
                       />
