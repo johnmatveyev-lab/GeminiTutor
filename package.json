@@ -4,14 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/dev-with-browser-control.mjs",
+    "dev": "vite",
     "dev:vite": "vite",
-    "browser-control": "node server/browserControlServer.mjs",
-    "build": "vite build",
     "lint": "tsc --noEmit",
-    "preview": "vite preview",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@google/genai": "^1.38.0",
