@@ -1,14 +1,10 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { cn } from './lib/utils';
-import { Header } from './components/Header';
-import { TranscriptionList } from './components/TranscriptionList';
-import { SessionList } from './components/SessionList';
-import { ScreenShare } from './components/ScreenShare';
-import { ControlPanel } from './components/ControlPanel';
 import {
   MODEL_NAME,
   TUTOR_TYPES,
+  AVAILABLE_VOICES,
   AI_INTERVIEW_LEVELS,
   AUDIO_CONFIG,
   FRAME_RATE,
@@ -16,7 +12,7 @@ import {
   ADAPTIVE_QUALITY,
   BROWSER_CONTROL_INSTRUCTION
 } from './constants';
-import { SessionStatus, Transcription, TutorType, ChatSession } from './types';
+import { SessionStatus, Transcription, ChatSession } from './types';
 import {
   decode,
   decodeAudioData,
@@ -140,6 +136,12 @@ const getBrowserLaunchUrl = (task?: string) => {
     : GOOGLE_HOME_URL;
 };
 
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
 const Toast: React.FC<{
   visible: boolean;
   variant?: 'error' | 'warning' | 'info' | 'success';
@@ -228,6 +230,9 @@ const App: React.FC = () => {
   const [isBrowserControlSkillEnabled, setIsBrowserControlSkillEnabled] = useState(() => {
     return localStorage.getItem('browser_control_skill_enabled') === 'true';
   });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isRecordingKey, setIsRecordingKey] = useState(false);
 
   const [sessionDuration, setSessionDuration] = useState(() => {
     return currentSession?.duration || 0;
@@ -263,6 +268,9 @@ const App: React.FC = () => {
   currentSessionIdRef.current = currentSessionId;
 
   const [showAutoSaveToast, setShowAutoSaveToast] = useState(false);
+  const transcriptScrollRef = useRef<HTMLDivElement>(null);
+  const appShellRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
 
   const updateCurrentSession = useCallback((updates: Partial<ChatSession>) => {
     if (!currentSessionIdRef.current) return;
@@ -339,6 +347,7 @@ const App: React.FC = () => {
   const [activeInputText, setActiveInputText] = useState('');
   const [activeOutputText, setActiveOutputText] = useState('');
   const [chatInput, setChatInput] = useState('');
+  const [queuedChatAfterStart, setQueuedChatAfterStart] = useState<string | null>(null);
 
   const createNewSession = useCallback(() => {
     const now = new Date();
@@ -453,7 +462,23 @@ const App: React.FC = () => {
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
     const text = chatInput.trim();
-    if (!text || !sessionRef.current || status !== SessionStatus.ACTIVE || !currentSessionId) return;
+    if (!text) return;
+
+    if (!currentSessionId) {
+      createNewSession();
+    }
+
+    if (status === SessionStatus.CONNECTING) {
+      setConnectionError('Session is still connecting. Please wait a second and try again.');
+      return;
+    }
+
+    if (status !== SessionStatus.ACTIVE || !sessionRef.current) {
+      setQueuedChatAfterStart(text);
+      setChatInput('');
+      void startSession();
+      return;
+    }
 
     const shouldInterceptAsBrowserTask =
       isBrowserTaskRequest(text) &&
@@ -472,18 +497,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const currentSessionData = sessionsRef.current.find(s => s.id === currentSessionId);
-    const newTranscription: Transcription = {
-      id: Date.now().toString() + '-user-text',
-      role: 'user',
-      text,
-      timestamp: Date.now()
-    };
-
-    updateCurrentSession({
-      transcriptions: [...(currentSessionData?.transcriptions || []), newTranscription]
-    });
-
+    addUserTranscription(text, 'user-text');
     setChatInput('');
   };
 
@@ -617,6 +631,7 @@ const App: React.FC = () => {
     setIsScreenSharing(false);
     setIsBrowserControlEnabled(false);
     setPendingBrowserTask(null);
+    setQueuedChatAfterStart(null);
     setStatus(SessionStatus.IDLE);
     setRetryCount(0);
     isStoppingSessionRef.current = false;
@@ -638,6 +653,7 @@ const App: React.FC = () => {
     setTheme('dark');
     setIsBrowserControlEnabled(false);
     setPendingBrowserTask(null);
+    setQueuedChatAfterStart(null);
     setBrowserControlError(null);
     setCurrentSessionId(null);
     setSessions([]);
@@ -665,6 +681,50 @@ const App: React.FC = () => {
       return () => clearTimeout(t);
     }
   }, [browserControlError]);
+
+  useEffect(() => {
+    if (!transcriptScrollRef.current) return;
+    transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight;
+  }, [transcriptions, activeInputText, activeOutputText]);
+
+  useEffect(() => {
+    const shell = appShellRef.current;
+    if (!shell) return;
+
+    let frame = 0;
+    let currentX = 56;
+    let currentY = 50;
+    let targetX = 56;
+    let targetY = 50;
+
+    const animate = () => {
+      currentX += (targetX - currentX) * 0.08;
+      currentY += (targetY - currentY) * 0.08;
+      shell.style.setProperty('--spotlight-x', `${currentX.toFixed(2)}%`);
+      shell.style.setProperty('--spotlight-y', `${currentY.toFixed(2)}%`);
+      frame = window.requestAnimationFrame(animate);
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      targetX = (event.clientX / window.innerWidth) * 100;
+      targetY = (event.clientY / window.innerHeight) * 100;
+    };
+
+    const recenter = () => {
+      targetX = 56;
+      targetY = 50;
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('pointerleave', recenter);
+    frame = window.requestAnimationFrame(animate);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerleave', recenter);
+    };
+  }, []);
 
   useEffect(() => {
     if (!process.env.API_KEY && process.env.NODE_ENV === 'production') {
@@ -820,6 +880,37 @@ const App: React.FC = () => {
       transcriptions: [...currentSession.transcriptions, newTranscription]
     });
   }, [updateCurrentSession]);
+
+  useEffect(() => {
+    if (!queuedChatAfterStart || status !== SessionStatus.ACTIVE || !sessionRef.current) return;
+
+    const queuedText = queuedChatAfterStart.trim();
+    if (!queuedText) {
+      setQueuedChatAfterStart(null);
+      return;
+    }
+
+    const shouldInterceptAsBrowserTask =
+      isBrowserTaskRequest(queuedText) &&
+      isBrowserControlSkillEnabledRef.current &&
+      isScreenSharingRef.current &&
+      isBrowserControlEnabledRef.current;
+
+    if (shouldInterceptAsBrowserTask) {
+      setPendingBrowserTask(queuedText);
+      setQueuedChatAfterStart(null);
+      return;
+    }
+
+    const sent = sendClientTurn(queuedText);
+    if (!sent) {
+      setConnectionError('Message could not be sent. Please restart the session and try again.');
+      return;
+    }
+
+    addUserTranscription(queuedText, 'user-text');
+    setQueuedChatAfterStart(null);
+  }, [queuedChatAfterStart, status, sendClientTurn, addUserTranscription]);
 
   const toggleBrowserControl = useCallback(() => {
     void (async () => {
@@ -1212,16 +1303,31 @@ const App: React.FC = () => {
   }, [isScreenSharing, status, networkQuality]);
 
   const keyboardHandlerStateRef = useRef({
-    status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenShare
+    status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenShare, isRecordingKey, isSettingsOpen, setIsSettingsOpen
   });
 
   useEffect(() => {
-    keyboardHandlerStateRef.current = { status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenShare };
-  }, [status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenShare]);
+    keyboardHandlerStateRef.current = { status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenShare, isRecordingKey, isSettingsOpen, setIsSettingsOpen };
+  }, [status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenShare, isRecordingKey, isSettingsOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const { status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenShare } = keyboardHandlerStateRef.current;
+      const { status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenShare, isRecordingKey, isSettingsOpen, setIsSettingsOpen } = keyboardHandlerStateRef.current;
+      if (isRecordingKey) return;
+      
+      if (e.key === 'Escape') {
+        if (isSettingsOpen) {
+          setIsSettingsOpen(false);
+          e.preventDefault();
+          return;
+        }
+      }
+
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.getAttribute('contenteditable') === 'true')) {
+        return;
+      }
+
       if (e.key === 'Shift') {
         const now = Date.now();
         if (now - lastShiftTimeRef.current < 500) {
@@ -1241,10 +1347,72 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const selectedTutorMeta = TUTOR_TYPES.find((t) => t.id === selectedTutorId) || TUTOR_TYPES[0];
+  const modeTutorItems = [
+    { id: 'generalist', label: 'Tutor' },
+    { id: 'language-coach', label: 'Language Coach' },
+    { id: 'drill-sergeant', label: 'Drill Sergeant' },
+    { id: 'ged-tutor', label: 'GED Prep' },
+  ];
+  const sidebarItems = [
+    {
+      id: 'new-chat',
+      label: 'New chat',
+      icon: (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 5v14m7-7H5" />
+      )
+    },
+    {
+      id: 'search',
+      label: 'Search chats',
+      icon: (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="m21 21-4.35-4.35M16 10.5a5.5 5.5 0 11-11 0 5.5 5.5 0 0111 0z" />
+      )
+    },
+    {
+      id: 'library',
+      label: 'Library',
+      icon: (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 19.5A2.5 2.5 0 016.5 17H20m-13.5 2.5V6A2.5 2.5 0 019 3.5h9A2 2 0 0120 5.5V17m-13.5 2.5H20M9.5 8H17" />
+      )
+    },
+  ];
+
   const anyToastVisible = connectionError || screenShareError || browserControlError || apiKeyError || errorNotification || showAutoSaveToast;
 
   return (
-    <div className="flex flex-col h-screen bg-transparent text-[var(--color-text-primary)] overflow-hidden relative">
+    <div
+      ref={appShellRef}
+      style={{ '--spotlight-x': '56%', '--spotlight-y': '50%' } as React.CSSProperties}
+      className="flex h-screen bg-transparent text-[var(--color-text-primary)] overflow-hidden relative font-[Inter,system-ui,sans-serif]"
+    >
+      <div
+        aria-hidden="true"
+        className={cn(
+          'pointer-events-none absolute inset-0 z-0',
+          theme === 'light'
+            ? 'bg-[radial-gradient(ellipse_80%_62%_at_50%_42%,rgba(59,130,246,0.14)_0%,rgba(59,130,246,0.06)_35%,rgba(255,255,255,0)_76%)]'
+            : 'bg-[radial-gradient(ellipse_82%_65%_at_50%_40%,rgba(21,63,220,0.22)_0%,rgba(13,34,91,0.16)_35%,rgba(0,0,0,0)_78%)]'
+        )}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-500"
+        style={{
+          background: theme === 'light'
+            ? 'radial-gradient(36% 30% at var(--spotlight-x) var(--spotlight-y), rgba(59,130,246,0.28) 0%, rgba(59,130,246,0.12) 42%, rgba(255,255,255,0) 78%)'
+            : 'radial-gradient(36% 30% at var(--spotlight-x) var(--spotlight-y), rgba(37,99,235,0.38) 0%, rgba(37,99,235,0.18) 42%, rgba(0,0,0,0) 78%)'
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-[16%] z-0 opacity-70 animate-[drift_16s_ease-in-out_infinite_alternate]"
+        style={{
+          background: theme === 'light'
+            ? 'radial-gradient(circle at 28% 28%, rgba(99,102,241,0.17), rgba(255,255,255,0) 48%), radial-gradient(circle at 72% 68%, rgba(59,130,246,0.15), rgba(255,255,255,0) 46%)'
+            : 'radial-gradient(circle at 28% 28%, rgba(99,102,241,0.28), rgba(0,0,0,0) 48%), radial-gradient(circle at 72% 68%, rgba(37,99,235,0.26), rgba(0,0,0,0) 46%)'
+        }}
+      />
       {/* === TOAST NOTIFICATIONS (consolidated, single instance each) === */}
       {anyToastVisible && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-3">
@@ -1333,111 +1501,440 @@ const App: React.FC = () => {
       )}
 
       {/* === MAIN LAYOUT === */}
-      <div className="relative z-10 flex flex-col h-full">
-        <div className="shrink-0 px-5 pt-5 pb-3">
-        <Header
-            status={status}
-            selectedTutorId={selectedTutorId}
-            onTutorSelect={setSelectedTutorId}
-            sessionDuration={sessionDuration}
-            selectedVoice={selectedVoice}
-            onVoiceSelect={setSelectedVoice}
-            shortcutKey={shortcutKey}
-            onShortcutKeyChange={setShortcutKey}
-            isBrowserControlSkillEnabled={isBrowserControlSkillEnabled}
-          onBrowserControlSkillChange={setIsBrowserControlSkillEnabled}
-          browserControlBridgeReady={browserControlBridgeReady}
-          onResetTestState={resetTestState}
-          theme={theme}
-          onThemeChange={setTheme}
-          interviewLevel={interviewLevel}
-          onInterviewLevelChange={setInterviewLevel}
-        />
-        </div>
-
-        <main className="flex-1 flex flex-col md:flex-row overflow-hidden px-4 md:px-5 pb-24 md:pb-28 gap-3 md:gap-4 max-w-6xl mx-auto w-full">
-          {/* Left: Sessions & Screen */}
-          <div className="flex-1 flex flex-col gap-4 overflow-hidden min-w-0 md:min-h-0">
-            <div className="shrink-0 max-h-[180px] md:shrink md:max-h-none md:flex-1 overflow-hidden">
-              <SessionList
-              sessions={sessions}
-              currentSessionId={currentSessionId}
-              onSelectSession={selectSession}
-              onCreateSession={createNewSession}
-              onDeleteSession={deleteSession}
-              onRenameSession={renameSession}
-            />
+      <div className="relative z-10 flex w-full h-full overflow-hidden">
+        <aside className={cn(
+          'h-full border-r border-white/8 bg-black/35 backdrop-blur-2xl transition-all duration-300 ease-out',
+          isSidebarCollapsed ? 'w-[74px]' : 'w-[300px]'
+        )}>
+          <div className="h-full flex flex-col">
+            <div className="px-4 pt-5 pb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-cyan-300 via-blue-500 to-indigo-500 shadow-[0_0_24px_rgba(59,130,246,0.4)]" />
+                {!isSidebarCollapsed && <span className="text-2xl font-semibold tracking-tight text-white/90">Gemini Tutor</span>}
+              </div>
+              <button
+                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                className="w-8 h-8 rounded-xl glass hover:bg-white/10 transition-colors"
+                title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                <svg className="w-4 h-4 mx-auto text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isSidebarCollapsed ? "M13 5l7 7-7 7M5 5l7 7-7 7" : "M11 5l-7 7 7 7M19 5l-7 7 7 7"} />
+                </svg>
+              </button>
             </div>
-            <ScreenShare
-              videoRef={videoRef}
-              isSharing={isScreenSharing}
-              onToggle={toggleScreenShare}
-              isBrowserControlEnabled={isBrowserControlEnabled}
-            />
+
+            <div className="px-3">
+              <button
+                onClick={createNewSession}
+                className="w-full h-11 rounded-2xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center gap-2 transition-colors shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
+              >
+                <span className="text-xl leading-none">+</span>
+                {!isSidebarCollapsed && <span className="font-medium">New Session</span>}
+              </button>
+            </div>
+
+            <div className="px-3 pt-4 space-y-1">
+              {sidebarItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    if (item.id === 'new-chat') {
+                      createNewSession();
+                      setIsSettingsOpen(false);
+                      return;
+                    }
+                    if (item.id === 'search') {
+                      chatInputRef.current?.focus();
+                      return;
+                    }
+                    if (item.id === 'library') {
+                      setIsSettingsOpen(true);
+                    }
+                  }}
+                  className={cn(
+                    'w-full h-10 rounded-xl text-white/75 hover:bg-white/10 transition-colors flex items-center gap-2',
+                    isSidebarCollapsed ? 'justify-center px-0' : 'px-3'
+                  )}
+                  title={isSidebarCollapsed ? item.label : undefined}
+                >
+                  <svg className="w-5 h-5 shrink-0 text-white/65" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {item.icon}
+                  </svg>
+                  {!isSidebarCollapsed && <span>{item.label}</span>}
+                </button>
+              ))}
+            </div>
+
+            {!isSidebarCollapsed && (
+              <div className="px-5 pt-5">
+                <p className="text-xs uppercase tracking-wider text-white/35 mb-2">Modes</p>
+                <div className="space-y-1.5">
+                  {modeTutorItems.map((mode) => {
+                    const tutor = TUTOR_TYPES.find((t) => t.id === mode.id);
+                    if (!tutor) return null;
+                    return (
+                      <button
+                        key={mode.id}
+                        onClick={() => setSelectedTutorId(mode.id)}
+                        className={cn(
+                          'w-full text-left px-3 py-2 rounded-xl transition-colors text-sm',
+                          selectedTutorId === mode.id ? 'bg-white/12 text-white' : 'text-white/70 hover:bg-white/8'
+                        )}
+                      >
+                        {mode.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {!isSidebarCollapsed && (
+              <div className="px-5 pt-6 min-h-0 flex-1 overflow-hidden">
+                <p className="text-xs uppercase tracking-wider text-white/35 mb-2">Recents</p>
+                <div className="space-y-1 overflow-y-auto max-h-full pr-1">
+                  {sessions.slice(0, 20).map((session) => (
+                    <button
+                      key={session.id}
+                      onClick={() => selectSession(session.id)}
+                      className={cn(
+                        'w-full text-left px-2 py-1.5 rounded-lg text-sm transition-colors truncate',
+                        currentSessionId === session.id ? 'text-white/95 bg-white/8' : 'text-white/60 hover:text-white/90 hover:bg-white/6'
+                      )}
+                    >
+                      {session.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-auto px-3 pb-5">
+              <div className="flex items-center justify-between">
+                {!isSidebarCollapsed && (
+                  <div className="text-sm text-white/65 truncate pr-2">
+                    <div className="font-medium text-white/85">John Matveyev</div>
+                    <div className="text-xs text-white/50">
+                      {status === SessionStatus.ACTIVE ? `Live · ${formatTime(sessionDuration)}` : `Ready · ${selectedTutorMeta.name}`}
+                    </div>
+                  </div>
+                )}
+                <button
+                  onClick={() => setIsSettingsOpen((prev) => !prev)}
+                  data-testid="settings-button"
+                  className="w-10 h-10 rounded-xl bg-white/8 hover:bg-white/12 border border-white/10 transition-colors shrink-0"
+                  title="Settings"
+                >
+                  <svg className="w-5 h-5 mx-auto text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <main className="flex-1 relative overflow-hidden">
+          {isSettingsOpen && (
+            <>
+              <div className="fixed inset-0 z-[120]" onClick={() => setIsSettingsOpen(false)} />
+              <div className={cn(
+                'fixed bottom-20 z-[130] w-80 rounded-2xl bg-[#171a21]/96 border border-white/18 backdrop-blur-xl shadow-2xl p-4 space-y-4',
+                isSidebarCollapsed ? 'left-20' : 'left-72'
+              )}>
+                <div>
+                  <p className="text-xs text-white/45 mb-1">Choose Tutor</p>
+                  <select
+                    value={selectedTutorId}
+                    onChange={(e) => setSelectedTutorId(e.target.value)}
+                    className="w-full h-10 rounded-xl bg-black/40 border border-white/14 px-3 text-sm"
+                  >
+                    {TUTOR_TYPES.map((tutor) => (
+                      <option key={tutor.id} value={tutor.id}>{tutor.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <p className="text-xs text-white/45 mb-1">Voice</p>
+                  <select
+                    value={selectedVoice}
+                    onChange={(e) => setSelectedVoice(e.target.value)}
+                    className="w-full h-10 rounded-xl bg-black/40 border border-white/14 px-3 text-sm"
+                  >
+                    {AVAILABLE_VOICES.map((voice) => (
+                      <option key={voice} value={voice}>{voice}</option>
+                    ))}
+                  </select>
+                </div>
+                {selectedTutorId === 'ai-interviewer' && (
+                  <div>
+                    <p className="text-xs text-white/45 mb-1">Interview Level</p>
+                    <select
+                      value={interviewLevel}
+                      onChange={(e) => setInterviewLevel(e.target.value)}
+                      className="w-full h-10 rounded-xl bg-black/40 border border-white/14 px-3 text-sm"
+                    >
+                      {AI_INTERVIEW_LEVELS.map((level) => (
+                        <option key={level.id} value={level.id}>{level.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setTheme('dark')}
+                    className={cn('h-10 rounded-xl text-sm', theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-white/10 text-white/75')}
+                  >
+                    Dark
+                  </button>
+                  <button
+                    onClick={() => setTheme('light')}
+                    className={cn('h-10 rounded-xl text-sm', theme === 'light' ? 'bg-blue-600 text-white' : 'bg-white/10 text-white/75')}
+                  >
+                    Light
+                  </button>
+                </div>
+
+                {/* Browser Control Skill */}
+                <div className="border-t border-white/5 pt-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-xs font-medium text-white/50 mb-1">Browser Control Skill</h3>
+                      <div className="flex items-center gap-1.5">
+                        <span className={cn('w-1.5 h-1.5 rounded-full', browserControlBridgeReady ? 'bg-[var(--color-success)] shadow-[0_0_6px_var(--color-success)]' : 'bg-[var(--color-warning)]')} />
+                        <span className="text-[10px] text-white/30">
+                          {browserControlBridgeReady ? 'Bridge ready' : 'Bridge offline'}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      data-testid="browser-skill-toggle"
+                      onClick={() => setIsBrowserControlSkillEnabled(!isBrowserControlSkillEnabled)}
+                      className={cn(
+                        'relative w-11 h-6 rounded-full border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/40 cursor-pointer',
+                        isBrowserControlSkillEnabled
+                          ? 'bg-[var(--color-primary)] border-[var(--color-primary-light)]/40 glow-primary'
+                          : 'bg-white/10 border-white/20'
+                      )}
+                      aria-pressed={isBrowserControlSkillEnabled}
+                    >
+                      <span
+                        className={cn(
+                          'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-[0_1px_6px_rgba(0,0,0,0.35)] transition-transform duration-200',
+                          isBrowserControlSkillEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+                        )}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Shortcut Key */}
+                <div className="border-t border-white/5 pt-3">
+                  <h3 className="text-xs font-medium text-white/50 mb-2">Quick Start Shortcut</h3>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsRecordingKey(true); }}
+                    onKeyDown={(e) => {
+                      if (isRecordingKey) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShortcutKey(e.code);
+                        setIsRecordingKey(false);
+                      }
+                    }}
+                    onBlur={() => setIsRecordingKey(false)}
+                    className={cn(
+                      'w-full text-left bg-black/40 border border-white/14 rounded-xl px-3 py-2 text-sm font-medium text-white transition-all duration-150 flex justify-between items-center cursor-pointer',
+                      isRecordingKey
+                        ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/30 glow-primary'
+                        : 'hover:bg-[var(--glass-bg-hover)]'
+                    )}
+                  >
+                    <span>{isRecordingKey ? 'Press any key...' : shortcutKey || 'None'}</span>
+                    {!isRecordingKey && (
+                      <span className="text-[10px] text-white/30 bg-white/10 px-1.5 py-0.5 rounded">Edit</span>
+                    )}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    data-testid="reset-test-state"
+                    onClick={() => { resetTestState(); setIsSettingsOpen(false); }}
+                    className="w-full mt-3 text-center bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm font-medium text-white/80 transition-all duration-150 hover:bg-white/10 cursor-pointer"
+                  >
+                    Reset Test State
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          <div
+            ref={transcriptScrollRef}
+            className="absolute inset-0 overflow-y-auto px-5 md:px-20 lg:px-36 pt-16 md:pt-20 pb-44"
+          >
+            {isScreenSharing && (
+              <div className="max-w-5xl mx-auto mb-8 rounded-3xl overflow-hidden border border-white/15 bg-black/40">
+                <video ref={videoRef} autoPlay playsInline className="w-full h-[280px] md:h-[360px] object-contain bg-black/70" />
+              </div>
+            )}
+
+            {transcriptions.length === 0 && !activeInputText && !activeOutputText && (
+              <div className="h-full min-h-[420px] flex flex-col items-center justify-center text-center">
+                <h2 className="text-4xl md:text-6xl font-medium tracking-tight text-white/90 mb-4">Hi John, what do you want to learn today?</h2>
+                <p className="text-white/45 max-w-2xl text-lg mb-6">Start an immersive lesson with {selectedTutorMeta.name} and ask anything in text, voice, or shared-screen mode.</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={status === SessionStatus.ACTIVE ? stopSession : startSession}
+                    data-testid="start-session"
+                    className={cn(
+                      'px-6 h-12 rounded-full border transition-colors shadow-[0_12px_34px_rgba(0,0,0,0.32)]',
+                      status === SessionStatus.ACTIVE
+                        ? 'bg-red-500/20 border-red-400/30 text-red-200'
+                        : 'bg-blue-600/85 hover:bg-blue-500 text-white border-blue-400/30'
+                    )}
+                  >
+                    {status === SessionStatus.ACTIVE ? 'End Session' : 'Start Session'}
+                  </button>
+                  <button
+                    onClick={toggleScreenShare}
+                    className="px-6 h-12 rounded-full bg-white/8 hover:bg-white/14 text-white border border-white/12 transition-colors shadow-[0_12px_34px_rgba(0,0,0,0.32)]"
+                  >
+                    {isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="max-w-4xl mx-auto space-y-5">
+              {transcriptions.map((item) => {
+                const isUser = item.role === 'user';
+                return (
+                  <div key={item.id} className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
+                    <div className={cn(
+                      'max-w-[78%] px-5 py-3 rounded-3xl text-[15px] leading-relaxed shadow-sm',
+                      isUser
+                        ? 'bg-blue-600 text-white rounded-br-xl'
+                        : 'bg-white/5 text-white/90 border border-white/10 rounded-bl-xl'
+                    )}>
+                      {item.text}
+                    </div>
+                  </div>
+                );
+              })}
+              {activeInputText && (
+                <div className="flex justify-end">
+                  <div className="max-w-[78%] px-5 py-3 rounded-3xl rounded-br-xl bg-blue-500/80 text-white">
+                    {activeInputText}
+                  </div>
+                </div>
+              )}
+              {activeOutputText && (
+                <div className="flex justify-start">
+                  <div className="max-w-[78%] px-5 py-3 rounded-3xl rounded-bl-xl bg-white/5 border border-white/10 text-white/90">
+                    {activeOutputText}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Right: Transcript & Chat */}
-          <div className="w-full md:w-[380px] shrink-0 flex flex-col gap-4 overflow-hidden min-h-0">
-            <div className="flex-1 overflow-hidden min-h-0">
-              <TranscriptionList
-                transcriptions={transcriptions}
-                status={status}
-                activeInputText={activeInputText}
-                activeOutputText={activeOutputText}
-                onClear={() => {
-                  if (currentSessionId) {
-                    updateCurrentSession({ transcriptions: [] });
-                    setSessionDuration(0);
-                  }
-                }}
-              />
-            </div>
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-7 w-[92%] max-w-5xl z-20">
             <form
               onSubmit={handleSendChat}
-              className="shrink-0 glass-input rounded-2xl p-1.5 flex items-center gap-2 relative z-10"
+              className="h-16 rounded-full bg-[#1b1e24]/96 border border-white/12 shadow-[0_18px_48px_rgba(0,0,0,0.46)] flex items-center gap-3 px-4"
             >
+              <button
+                type="button"
+                onClick={toggleScreenShare}
+                data-testid="screen-share-toggle"
+                className="w-10 h-10 rounded-full text-white/80 hover:bg-white/10 transition-colors text-2xl leading-none shrink-0"
+                title={isScreenSharing ? 'Stop screen share' : 'Share screen'}
+              >
+                +
+              </button>
               <input
+                ref={chatInputRef}
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder={status === SessionStatus.ACTIVE ? "Type a message..." : "Start session to chat"}
-                disabled={status !== SessionStatus.ACTIVE}
-                className="flex-1 bg-transparent border-none outline-none text-white px-4 py-2.5 text-sm placeholder:text-white/25 disabled:opacity-40"
+                placeholder={isE2EMode ? 'Type a message...' : `Ask ${selectedTutorMeta.name}...`}
+                className="flex-1 basis-0 min-w-[180px] bg-transparent border-none outline-none text-white placeholder:text-white/40 text-base md:text-lg"
               />
+              <select
+                value={selectedTutorId}
+                onChange={(e) => setSelectedTutorId(e.target.value)}
+                className="h-10 rounded-full bg-black/25 border border-white/12 px-4 text-sm text-white/85 max-w-[180px]"
+              >
+                {TUTOR_TYPES.map((tutor) => (
+                  <option key={tutor.id} value={tutor.id} className="text-black">
+                    {tutor.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setIsMuted((prev) => !prev)}
+                className={cn(
+                  'w-10 h-10 rounded-full transition-colors',
+                  isMuted ? 'bg-red-500/20 text-red-300' : 'text-white/80 hover:bg-white/10'
+                )}
+                title={isMuted ? 'Unmute' : 'Mute'}
+              >
+                <svg className="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 1v11m0 0a3 3 0 003-3V6a3 3 0 10-6 0v3a3 3 0 003 3zM5 10a7 7 0 0014 0M12 19v4m-4 0h8" />
+                </svg>
+              </button>
               <button
                 type="submit"
                 data-testid="chat-send"
-                disabled={!chatInput.trim() || status !== SessionStatus.ACTIVE}
+                disabled={!chatInput.trim() || status === SessionStatus.CONNECTING}
                 className={cn(
-                  'w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150 shrink-0',
-                  chatInput.trim() && status === SessionStatus.ACTIVE
-                    ? 'bg-[var(--color-primary)] text-white glow-primary hover:bg-[var(--color-primary-hover)]'
-                    : 'bg-white/5 text-white/30'
+                  'h-10 px-5 rounded-full text-sm font-medium transition-colors',
+                  chatInput.trim() && status !== SessionStatus.CONNECTING
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                    : 'bg-white/10 text-white/35'
                 )}
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
+                Send
               </button>
             </form>
+            <div className="flex items-center justify-center gap-3 mt-3">
+              <button
+                type="button"
+                onClick={status === SessionStatus.ACTIVE ? stopSession : startSession}
+                data-testid={status === SessionStatus.ACTIVE ? "end-session" : "footer-start-session"}
+                className={cn(
+                  'h-10 px-5 rounded-full text-sm transition-colors border',
+                  status === SessionStatus.ACTIVE
+                    ? 'bg-red-500/20 border-red-400/30 text-red-200'
+                    : 'bg-white/10 border-white/15 text-white/85 hover:bg-white/15'
+                )}
+              >
+                {status === SessionStatus.ACTIVE ? 'End Session' : 'Start Session'}
+              </button>
+              <button
+                type="button"
+                onClick={toggleBrowserControl}
+                data-testid="browser-control-toggle"
+                aria-pressed={isBrowserControlEnabled ? 'true' : 'false'}
+                disabled={status !== SessionStatus.ACTIVE || !isBrowserControlSkillEnabled || !browserControlBridgeReady}
+                className={cn(
+                  'h-10 px-5 rounded-full text-sm border transition-colors',
+                  isBrowserControlEnabled
+                    ? 'bg-blue-500/25 border-blue-300/40 text-blue-100'
+                    : 'bg-white/10 border-white/15 text-white/75 disabled:opacity-45'
+                )}
+              >
+                Browser Control
+              </button>
+            </div>
           </div>
 
           <canvas ref={canvasRef} style={{ display: 'none' }} />
         </main>
-
-        <ControlPanel
-          status={status}
-          isMuted={isMuted}
-          onToggleMute={() => setIsMuted(!isMuted)}
-          onStart={startSession}
-          onStop={stopSession}
-          onToggleScreen={toggleScreenShare}
-          isScreenSharing={isScreenSharing}
-          onToggleBrowserControl={toggleBrowserControl}
-          isBrowserControlEnabled={isBrowserControlEnabled}
-          isBrowserControlSkillEnabled={isBrowserControlSkillEnabled}
-          isBrowserControlBridgeReady={browserControlBridgeReady}
-        />
       </div>
     </div>
   );
