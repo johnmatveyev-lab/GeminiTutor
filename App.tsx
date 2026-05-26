@@ -27,6 +27,13 @@ import {
   getBrowserInfo,
   getCompatibilityMessage
 } from './services/browserUtils';
+import { Toast } from './components/Toast';
+import { SessionSwitchModal } from './components/Modals';
+import { SessionSidebar } from './components/SessionSidebar';
+import { SettingsPanel } from './components/SettingsPanel';
+import { ChatInput } from './components/ChatInput';
+import { TranscriptionList } from './components/TranscriptionList';
+import { ScreenShare } from './components/ScreenShare';
 
 const isE2EMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e');
 const USER_NAME = 'User';
@@ -35,60 +42,6 @@ const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-};
-
-const Toast: React.FC<{
-  visible: boolean;
-  variant?: 'error' | 'warning' | 'info' | 'success';
-  title: string;
-  message?: string;
-  onClose: () => void;
-  className?: string;
-}> = ({ visible, variant = 'info', title, message, onClose, className }) => {
-  if (!visible) return null;
-
-  const variantStyles = {
-    error: 'border-[var(--color-danger)]/20 glow-danger',
-    warning: 'border-[var(--color-warning)]/20 glow-warning',
-    info: 'border-[var(--color-primary)]/20 glow-primary',
-    success: 'border-[var(--color-success)]/20 glow-success',
-  };
-
-  return (
-    <div className={cn(
-      'glass-strong px-5 py-3 rounded-full flex items-center gap-3 max-w-md',
-      'animate-slide-in-top',
-      variantStyles[variant],
-      className
-    )}>
-      <svg className="w-4 h-4 flex-shrink-0 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        {variant === 'error' && (
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        )}
-        {variant === 'warning' && (
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        )}
-        {variant === 'info' && (
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        )}
-        {variant === 'success' && (
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-        )}
-      </svg>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-white/90">{title}</p>
-        {message && <p className="text-xs text-white/60 mt-0.5">{message}</p>}
-      </div>
-      <button
-        onClick={onClose}
-        className="p-1 hover:bg-white/10 rounded-full transition-colors duration-150"
-      >
-        <svg className="w-3.5 h-3.5 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-  );
 };
 
 const App: React.FC = () => {
@@ -751,7 +704,19 @@ const handleMessage = async (message: LiveServerMessage) => {
     }
 
     if (message.serverContent?.interrupted) {
-      audioSourcesRef.current.forEach(s => { try { s.stop(); } catch (e) { } });
+      audioSourcesRef.current.forEach(s => {
+        try {
+          const ctx = outputAudioCtxRef.current;
+          if (ctx) {
+            const gainNode = ctx.createGain();
+            gainNode.gain.setValueAtTime(1, ctx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.05);
+            s.connect(gainNode);
+            gainNode.connect(ctx.destination);
+          }
+          s.stop();
+        } catch (e) { }
+      });
       audioSourcesRef.current.clear();
       nextStartTimeRef.current = 0;
     }
@@ -1051,29 +1016,6 @@ status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenSha
     { id: 'drill-sergeant', label: 'Drill Sergeant' },
     { id: 'ged-tutor', label: 'GED Prep' },
   ];
-  const sidebarItems = [
-    {
-      id: 'new-chat',
-      label: 'New chat',
-      icon: (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 5v14m7-7H5" />
-      )
-    },
-    {
-      id: 'search',
-      label: 'Search chats',
-      icon: (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="m21 21-4.35-4.35M16 10.5a5.5 5.5 0 11-11 0 5.5 5.5 0 0111 0z" />
-      )
-    },
-    {
-      id: 'library',
-      label: 'Library',
-      icon: (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 19.5A2.5 2.5 0 016.5 17H20m-13.5 2.5V6A2.5 2.5 0 019 3.5h9A2 2 0 0120 5.5V17m-13.5 2.5H20M9.5 8H17" />
-      )
-    },
-  ];
 
   const anyToastVisible = connectionError || screenShareError || apiKeyError || errorNotification || showAutoSaveToast;
 
@@ -1110,7 +1052,7 @@ status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenSha
             : 'radial-gradient(circle at 28% 28%, rgba(99,102,241,0.28), rgba(0,0,0,0) 48%), radial-gradient(circle at 72% 68%, rgba(37,99,235,0.26), rgba(0,0,0,0) 46%)'
         }}
       />
-      {/* === TOAST NOTIFICATIONS (consolidated, single instance each) === */}
+      {/* === TOAST NOTIFICATIONS === */}
       {anyToastVisible && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-3">
           <Toast visible={!!connectionError} variant="error" title="Connection Error" message={connectionError || undefined} onClose={() => setConnectionError(null)} />
@@ -1121,425 +1063,87 @@ status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenSha
         </div>
       )}
 
-      {/* === SESSION SWITCH WARNING DIALOG === */}
-      {sessionSwitchWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="glass-card rounded-2xl p-6 max-w-md mx-4 animate-scale-in">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-[var(--color-warning-muted)] flex items-center justify-center">
-                <svg className="w-5 h-5 text-[var(--color-warning)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold">
-                {pendingSessionId === null ? 'Delete Active Session?' : 'Active Session in Progress'}
-              </h3>
-            </div>
-            <p className="text-sm text-white/60 mb-5 leading-relaxed">
-              {pendingSessionId === null
-                ? 'You have an active tutoring session. Deleting this session will end it and remove all data. Are you sure?'
-                : 'You have an active tutoring session. Switching sessions will end the current session. Are you sure?'}
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={cancelSessionSwitch}
-                className="flex-1 px-4 py-2.5 glass hover:bg-[var(--glass-bg-hover)] rounded-xl font-medium transition-colors duration-150"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmSessionSwitch}
-                className="flex-1 px-4 py-2.5 bg-[var(--color-warning)] hover:bg-[var(--color-warning)]/90 text-white rounded-xl font-medium transition-colors duration-150 glow-warning"
-              >
-                {pendingSessionId === null ? 'End & Delete' : 'End & Switch'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SessionSwitchModal
+        sessionSwitchWarning={sessionSwitchWarning}
+        pendingSessionId={pendingSessionId}
+        cancelSessionSwitch={cancelSessionSwitch}
+        confirmSessionSwitch={confirmSessionSwitch}
+      />
 
       {/* === MAIN LAYOUT === */}
       <div className="relative z-10 flex w-full h-full overflow-hidden">
-        <aside className={cn(
-          'h-full border-r border-white/8 bg-black/35 backdrop-blur-2xl transition-all duration-300 ease-out',
-          isSidebarCollapsed ? 'w-[74px]' : 'w-[300px]'
-        )}>
-          <div className="h-full flex flex-col">
-            <div className="px-4 pt-5 pb-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-cyan-300 via-blue-500 to-indigo-500 shadow-[0_0_24px_rgba(59,130,246,0.4)]" />
-                {!isSidebarCollapsed && <span className="text-2xl font-semibold tracking-tight text-white/90">Gemini Tutor</span>}
-              </div>
-              <button
-                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-                className="w-8 h-8 rounded-xl glass hover:bg-white/10 transition-colors"
-                title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              >
-                <svg className="w-4 h-4 mx-auto text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isSidebarCollapsed ? "M13 5l7 7-7 7M5 5l7 7-7 7" : "M11 5l-7 7 7 7M19 5l-7 7 7 7"} />
-                </svg>
-              </button>
-            </div>
-
-            <div className="px-3">
-              <button
-                onClick={createNewSession}
-                className="w-full h-11 rounded-2xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center gap-2 transition-colors shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
-              >
-                <span className="text-xl leading-none">+</span>
-                {!isSidebarCollapsed && <span className="font-medium">New Session</span>}
-              </button>
-            </div>
-
-            <div className="px-3 pt-4 space-y-1">
-              {sidebarItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    if (item.id === 'new-chat') {
-                      createNewSession();
-                      setIsSettingsOpen(false);
-                      return;
-                    }
-                    if (item.id === 'search') {
-                      chatInputRef.current?.focus();
-                      return;
-                    }
-                    if (item.id === 'library') {
-                      setIsSettingsOpen(true);
-                    }
-                  }}
-                  className={cn(
-                    'w-full h-10 rounded-xl text-white/75 hover:bg-white/10 transition-colors flex items-center gap-2',
-                    isSidebarCollapsed ? 'justify-center px-0' : 'px-3'
-                  )}
-                  title={isSidebarCollapsed ? item.label : undefined}
-                >
-                  <svg className="w-5 h-5 shrink-0 text-white/65" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    {item.icon}
-                  </svg>
-                  {!isSidebarCollapsed && <span>{item.label}</span>}
-                </button>
-              ))}
-            </div>
-
-            {!isSidebarCollapsed && (
-              <div className="px-5 pt-5">
-                <p className="text-xs uppercase tracking-wider text-white/35 mb-2">Modes</p>
-                <div className="space-y-1.5">
-                  {modeTutorItems.map((mode) => {
-                    const tutor = TUTOR_TYPES.find((t) => t.id === mode.id);
-                    if (!tutor) return null;
-                    return (
-                      <button
-                        key={mode.id}
-                        onClick={() => setSelectedTutorId(mode.id)}
-                        className={cn(
-                          'w-full text-left px-3 py-2 rounded-xl transition-colors text-sm',
-                          selectedTutorId === mode.id ? 'bg-white/12 text-white' : 'text-white/70 hover:bg-white/8'
-                        )}
-                      >
-                        {mode.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {!isSidebarCollapsed && (
-              <div className="px-5 pt-6 min-h-0 flex-1 overflow-hidden">
-                <p className="text-xs uppercase tracking-wider text-white/35 mb-2">Recents</p>
-                <div className="space-y-1 overflow-y-auto max-h-full pr-1">
-                  {sessions.slice(0, 20).map((session) => (
-                    <button
-                      key={session.id}
-                      onClick={() => selectSession(session.id)}
-                      className={cn(
-                        'w-full text-left px-2 py-1.5 rounded-lg text-sm transition-colors truncate',
-                        currentSessionId === session.id ? 'text-white/95 bg-white/8' : 'text-white/60 hover:text-white/90 hover:bg-white/6'
-                      )}
-                    >
-                      {session.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-auto px-3 pb-5">
-              <div className="flex items-center justify-between">
-                {!isSidebarCollapsed && (
-                  <div className="text-sm text-white/65 truncate pr-2">
-                    <div className="font-medium text-white/85">{USER_NAME}</div>
-                    <div className="text-xs text-white/50">
-                      {status === SessionStatus.ACTIVE ? `Live · ${formatTime(sessionDuration)}` : `Ready · ${selectedTutorMeta.name}`}
-                    </div>
-                  </div>
-                )}
-                <button
-                  onClick={() => setIsSettingsOpen((prev) => !prev)}
-                  data-testid="settings-button"
-                  className="w-10 h-10 rounded-xl bg-white/8 hover:bg-white/12 border border-white/10 transition-colors shrink-0"
-                  title="Settings"
-                >
-                  <svg className="w-5 h-5 mx-auto text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-        </aside>
+        <SessionSidebar
+          isSidebarCollapsed={isSidebarCollapsed}
+          setIsSidebarCollapsed={setIsSidebarCollapsed}
+          createNewSession={createNewSession}
+          selectedTutorId={selectedTutorId}
+          setSelectedTutorId={setSelectedTutorId}
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          selectSession={selectSession}
+          status={status}
+          sessionDuration={sessionDuration}
+          formatTime={formatTime}
+          selectedTutorMeta={selectedTutorMeta}
+          setIsSettingsOpen={setIsSettingsOpen}
+          USER_NAME={USER_NAME}
+          networkQuality={networkQuality}
+          renameSession={renameSession}
+        />
 
         <main className="flex-1 relative overflow-hidden">
-          {isSettingsOpen && (
-            <>
-              <div className="fixed inset-0 z-[120]" onClick={() => setIsSettingsOpen(false)} />
-              <div className={cn(
-                'fixed bottom-20 z-[130] w-80 rounded-2xl bg-[#171a21]/96 border border-white/18 backdrop-blur-xl shadow-2xl p-4 space-y-4',
-                isSidebarCollapsed ? 'left-20' : 'left-72'
-              )}>
-                <div>
-                  <p className="text-xs text-white/45 mb-1">Choose Tutor</p>
-                  <select
-                    value={selectedTutorId}
-                    onChange={(e) => setSelectedTutorId(e.target.value)}
-                    className="w-full h-10 rounded-xl bg-black/40 border border-white/14 px-3 text-sm"
-                  >
-                    {TUTOR_TYPES.map((tutor) => (
-                      <option key={tutor.id} value={tutor.id}>{tutor.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <p className="text-xs text-white/45 mb-1">Voice</p>
-                  <select
-                    value={selectedVoice}
-                    onChange={(e) => setSelectedVoice(e.target.value)}
-                    className="w-full h-10 rounded-xl bg-black/40 border border-white/14 px-3 text-sm"
-                  >
-                    {AVAILABLE_VOICES.map((voice) => (
-                      <option key={voice} value={voice}>{voice}</option>
-                    ))}
-                  </select>
-                </div>
-                {selectedTutorId === 'ai-interviewer' && (
-                  <div>
-                    <p className="text-xs text-white/45 mb-1">Interview Level</p>
-                    <select
-                      value={interviewLevel}
-                      onChange={(e) => setInterviewLevel(e.target.value)}
-                      className="w-full h-10 rounded-xl bg-black/40 border border-white/14 px-3 text-sm"
-                    >
-                      {AI_INTERVIEW_LEVELS.map((level) => (
-                        <option key={level.id} value={level.id}>{level.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setTheme('dark')}
-                    className={cn('h-10 rounded-xl text-sm', theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-white/10 text-white/75')}
-                  >
-                    Dark
-                  </button>
-                  <button
-                    onClick={() => setTheme('light')}
-                    className={cn('h-10 rounded-xl text-sm', theme === 'light' ? 'bg-blue-600 text-white' : 'bg-white/10 text-white/75')}
-                  >
-                    Light
-                  </button>
-                </div>
+          <SettingsPanel
+            isSettingsOpen={isSettingsOpen}
+            setIsSettingsOpen={setIsSettingsOpen}
+            isSidebarCollapsed={isSidebarCollapsed}
+            selectedTutorId={selectedTutorId}
+            setSelectedTutorId={setSelectedTutorId}
+            selectedVoice={selectedVoice}
+            setSelectedVoice={setSelectedVoice}
+            interviewLevel={interviewLevel}
+            setInterviewLevel={setInterviewLevel}
+            theme={theme}
+            setTheme={setTheme}
+            shortcutKey={shortcutKey}
+            setShortcutKey={setShortcutKey}
+            resetTestState={resetTestState}
+            isRecordingKey={isRecordingKey}
+            setIsRecordingKey={setIsRecordingKey}
+          />
 
-                <div className="border-t border-white/5 pt-3">
-                  <h3 className="text-xs font-medium text-white/50 mb-2">Quick Start Shortcut</h3>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setIsRecordingKey(true); }}
-                    onKeyDown={(e) => {
-                      if (isRecordingKey) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShortcutKey(e.code);
-                        setIsRecordingKey(false);
-                      }
-                    }}
-                    onBlur={() => setIsRecordingKey(false)}
-                    className={cn(
-                      'w-full text-left bg-black/40 border border-white/14 rounded-xl px-3 py-2 text-sm font-medium text-white transition-all duration-150 flex justify-between items-center cursor-pointer',
-                      isRecordingKey
-                        ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/30 glow-primary'
-                        : 'hover:bg-[var(--glass-bg-hover)]'
-                    )}
-                  >
-                    <span>{isRecordingKey ? 'Press any key...' : shortcutKey || 'None'}</span>
-                    {!isRecordingKey && (
-                      <span className="text-[10px] text-white/30 bg-white/10 px-1.5 py-0.5 rounded">Edit</span>
-                    )}
-                  </button>
-                  
-                  <button
-                    type="button"
-                    data-testid="reset-test-state"
-                    onClick={() => { resetTestState(); setIsSettingsOpen(false); }}
-                    className="w-full mt-3 text-center bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm font-medium text-white/80 transition-all duration-150 hover:bg-white/10 cursor-pointer"
-                  >
-                    Reset Test State
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
+          <TranscriptionList
+            transcriptions={transcriptions}
+            activeInputText={activeInputText}
+            activeOutputText={activeOutputText}
+            status={status}
+            stopSession={stopSession}
+            startSession={startSession}
+            toggleScreenShare={toggleScreenShare}
+            isScreenSharing={isScreenSharing}
+            selectedTutorMeta={selectedTutorMeta}
+            transcriptScrollRef={transcriptScrollRef}
+            currentSession={currentSession}
+          />
 
-          <div
-            ref={transcriptScrollRef}
-            className="absolute inset-0 overflow-y-auto px-5 md:px-20 lg:px-36 pt-16 md:pt-20 pb-44"
-          >
-            {isScreenSharing && (
-              <div className="max-w-5xl mx-auto mb-8 rounded-3xl overflow-hidden border border-white/15 bg-black/40">
-                <video ref={videoRef} autoPlay playsInline className="w-full h-[280px] md:h-[360px] object-contain bg-black/70" />
-              </div>
-            )}
-
-            {transcriptions.length === 0 && !activeInputText && !activeOutputText && (
-              <div className="h-full min-h-[420px] flex flex-col items-center justify-center text-center">
-                <h2 className="text-4xl md:text-6xl font-medium tracking-tight text-white/90 mb-4">Hi there, what do you want to learn today?</h2>
-                <p className="text-white/45 max-w-2xl text-lg mb-6">Start an immersive lesson with {selectedTutorMeta.name} and ask anything in text, voice, or shared-screen mode.</p>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={status === SessionStatus.ACTIVE ? stopSession : startSession}
-                    data-testid="start-session"
-                    className={cn(
-                      'px-6 h-12 rounded-full border transition-colors shadow-[0_12px_34px_rgba(0,0,0,0.32)]',
-                      status === SessionStatus.ACTIVE
-                        ? 'bg-red-500/20 border-red-400/30 text-red-200'
-                        : 'bg-blue-600/85 hover:bg-blue-500 text-white border-blue-400/30'
-                    )}
-                  >
-                    {status === SessionStatus.ACTIVE ? 'End Session' : 'Start Session'}
-                  </button>
-                  <button
-                    onClick={toggleScreenShare}
-                    className="px-6 h-12 rounded-full bg-white/8 hover:bg-white/14 text-white border border-white/12 transition-colors shadow-[0_12px_34px_rgba(0,0,0,0.32)]"
-                  >
-                    {isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="max-w-4xl mx-auto space-y-5">
-              {transcriptions.map((item) => {
-                const isUser = item.role === 'user';
-                return (
-                  <div key={item.id} className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
-                    <div className={cn(
-                      'max-w-[78%] px-5 py-3 rounded-3xl text-[15px] leading-relaxed shadow-sm',
-                      isUser
-                        ? 'bg-blue-600 text-white rounded-br-xl'
-                        : 'bg-white/5 text-white/90 border border-white/10 rounded-bl-xl'
-                    )}>
-                      {item.text}
-                    </div>
-                  </div>
-                );
-              })}
-              {activeInputText && (
-                <div className="flex justify-end">
-                  <div className="max-w-[78%] px-5 py-3 rounded-3xl rounded-br-xl bg-blue-500/80 text-white">
-                    {activeInputText}
-                  </div>
-                </div>
-              )}
-              {activeOutputText && (
-                <div className="flex justify-start">
-                  <div className="max-w-[78%] px-5 py-3 rounded-3xl rounded-bl-xl bg-white/5 border border-white/10 text-white/90">
-                    {activeOutputText}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="absolute left-1/2 -translate-x-1/2 bottom-7 w-[92%] max-w-5xl z-20">
-            <form
-              onSubmit={handleSendChat}
-              className="h-16 rounded-full bg-[#1b1e24]/96 border border-white/12 shadow-[0_18px_48px_rgba(0,0,0,0.46)] flex items-center gap-3 px-4"
-            >
-              <button
-                type="button"
-                onClick={toggleScreenShare}
-                data-testid="screen-share-toggle"
-                className="w-10 h-10 rounded-full text-white/80 hover:bg-white/10 transition-colors text-2xl leading-none shrink-0"
-                title={isScreenSharing ? 'Stop screen share' : 'Share screen'}
-              >
-                +
-              </button>
-              <input
-                ref={chatInputRef}
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder={isE2EMode ? 'Type a message...' : `Ask ${selectedTutorMeta.name}...`}
-                className="flex-1 basis-0 min-w-[180px] bg-transparent border-none outline-none text-white placeholder:text-white/40 text-base md:text-lg"
-              />
-              <select
-                value={selectedTutorId}
-                onChange={(e) => setSelectedTutorId(e.target.value)}
-                className="h-10 rounded-full bg-black/25 border border-white/12 px-4 text-sm text-white/85 max-w-[180px]"
-              >
-                {TUTOR_TYPES.map((tutor) => (
-                  <option key={tutor.id} value={tutor.id} className="text-black">
-                    {tutor.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setIsMuted((prev) => !prev)}
-                className={cn(
-                  'w-10 h-10 rounded-full transition-colors',
-                  isMuted ? 'bg-red-500/20 text-red-300' : 'text-white/80 hover:bg-white/10'
-                )}
-                title={isMuted ? 'Unmute' : 'Mute'}
-              >
-                <svg className="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 1v11m0 0a3 3 0 003-3V6a3 3 0 10-6 0v3a3 3 0 003 3zM5 10a7 7 0 0014 0M12 19v4m-4 0h8" />
-                </svg>
-              </button>
-              <button
-                type="submit"
-                data-testid="chat-send"
-                disabled={!chatInput.trim() || status === SessionStatus.CONNECTING}
-                className={cn(
-                  'h-10 px-5 rounded-full text-sm font-medium transition-colors',
-                  chatInput.trim() && status !== SessionStatus.CONNECTING
-                    ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                    : 'bg-white/10 text-white/35'
-                )}
-              >
-                Send
-              </button>
-            </form>
-            <div className="flex items-center justify-center gap-3 mt-3">
-<button
-                type="button"
-                onClick={status === SessionStatus.ACTIVE ? stopSession : startSession}
-                data-testid={status === SessionStatus.ACTIVE ? "end-session" : "footer-start-session"}
-                className={cn(
-                  'h-10 px-5 rounded-full text-sm transition-colors border',
-                  status === SessionStatus.ACTIVE
-                    ? 'bg-red-500/20 border-red-400/30 text-red-200'
-                    : 'bg-white/10 border-white/15 text-white/85 hover:bg-white/15'
-                )}
-              >
-                {status === SessionStatus.ACTIVE ? 'End Session' : 'Start Session'}
-              </button>
-            </div>
-          </div>
+          <ChatInput
+            chatInput={chatInput}
+            setChatInput={setChatInput}
+            handleSendChat={handleSendChat}
+            toggleScreenShare={toggleScreenShare}
+            isScreenSharing={isScreenSharing}
+            selectedTutorId={selectedTutorId}
+            setSelectedTutorId={setSelectedTutorId}
+            isMuted={isMuted}
+            setIsMuted={setIsMuted}
+            status={status}
+            stopSession={stopSession}
+            startSession={startSession}
+            chatInputRef={chatInputRef}
+            sessionDuration={sessionDuration}
+            selectedTutorMeta={selectedTutorMeta}
+            isE2EMode={isE2EMode}
+            formatTime={formatTime}
+          />
 
           <canvas ref={canvasRef} style={{ display: 'none' }} />
         </main>
