@@ -4,3 +4,8 @@ dist
 .vercel
 .DS_Store
 *.local
+.browser-control-profile
+test-results
+playwright-report
+blob-report
+.cache

@@ -70,6 +70,8 @@ export const SessionSidebar: React.FC<{
     { id: 'language-coach', label: 'Language Coach' },
     { id: 'drill-sergeant', label: 'Drill Sergeant' },
     { id: 'ged-tutor', label: 'GED Prep' },
+    { id: 'claude-code-tutor', label: 'Claude Code' },
+    { id: 'adhd-tutor', label: 'ADHD Mock Specialist' },
   ];
 
   const qualityDotColor = networkQuality === 'high' ? 'bg-green-400' : networkQuality === 'medium' ? 'bg-yellow-400' : 'bg-red-400';

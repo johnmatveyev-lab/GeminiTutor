@@ -107,10 +107,10 @@ export const ChatInput: React.FC<{
           onClick={status === SessionStatus.ACTIVE ? stopSession : startSession}
           data-testid={status === SessionStatus.ACTIVE ? "end-session" : "footer-start-session"}
           className={cn(
-            'h-10 px-5 rounded-full text-sm transition-colors border',
+            'h-10 px-6 rounded-full text-sm font-semibold border transition-all duration-200 hover:scale-105 active:scale-95 shadow-[0_4px_16px_rgba(0,0,0,0.25)] cursor-pointer',
             status === SessionStatus.ACTIVE
-              ? 'bg-red-500/20 border-red-400/30 text-red-200'
-              : 'bg-white/10 border-white/15 text-white/85 hover:bg-white/15'
+              ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white border-rose-400/30 shadow-[0_0_24px_rgba(239,68,68,0.3)] animate-pulse-red'
+              : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white border-emerald-400/30 hover:shadow-[0_0_24px_rgba(16,185,129,0.35)]'
           )}
         >
           {status === SessionStatus.ACTIVE ? 'End Session' : 'Start Session'}

@@ -44,6 +44,56 @@ const formatTime = (seconds: number) => {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 };
 
+const playSessionSound = (type: 'start' | 'end') => {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    const now = ctx.currentTime;
+    if (type === 'start') {
+      // Ascending pleasant chime
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, now); // C5
+      osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+      osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+      
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.15, now + 0.05);
+      gain.gain.setValueAtTime(0.15, now + 0.25);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      
+      osc.start(now);
+      osc.stop(now + 0.5);
+    } else {
+      // Descending pleasant chime
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(783.99, now); // G5
+      osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+      osc.frequency.setValueAtTime(523.25, now + 0.2); // C5
+      
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
+      gain.gain.setValueAtTime(0.12, now + 0.25);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      
+      osc.start(now);
+      osc.stop(now + 0.5);
+    }
+    
+    setTimeout(() => {
+      ctx.close().catch(() => {});
+    }, 600);
+  } catch (e) {
+    console.warn('Could not play session sound:', e);
+  }
+};
+
 const App: React.FC = () => {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const storedTheme = localStorage.getItem('theme_preference');
@@ -399,6 +449,7 @@ const App: React.FC = () => {
   const aiRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const inputAudioCtxRef = useRef<AudioContext | null>(null);
@@ -413,6 +464,7 @@ const App: React.FC = () => {
 
   const stopSession = useCallback(() => {
     if (isStoppingSessionRef.current) return;
+    playSessionSound('end');
     isStoppingSessionRef.current = true;
     manualSessionStopRef.current = true;
     if (retryTimeoutRef.current) {
@@ -452,6 +504,13 @@ const App: React.FC = () => {
         try { track.stop(); } catch (e) { console.warn('Error stopping video track:', e); }
       });
       videoRef.current.srcObject = null;
+    }
+    if (screenStreamRef.current) {
+      const tracks = screenStreamRef.current.getTracks();
+      tracks.forEach(track => {
+        try { track.stop(); } catch (e) { console.warn('Error stopping screen track:', e); }
+      });
+      screenStreamRef.current = null;
     }
 
     nextStartTimeRef.current = 0;
@@ -600,21 +659,6 @@ const App: React.FC = () => {
     return sendClientTurn(text);
   }, [sendClientTurn]);
 
-  const addUserTranscription = useCallback((text: string, suffix = 'user-text') => {
-    if (!currentSessionIdRef.current) return;
-    const currentSession = sessionsRef.current.find(s => s.id === currentSessionIdRef.current);
-    if (!currentSession) return;
-    const newTranscription: Transcription = {
-      id: `${Date.now()}-${suffix}`,
-      role: 'user',
-      text,
-      timestamp: Date.now()
-    };
-    updateCurrentSession({
-      transcriptions: [...currentSession.transcriptions, newTranscription]
-    });
-  }, [updateCurrentSession]);
-
   const addModelTranscription = useCallback((text: string, suffix = 'model-text') => {
     if (!currentSessionIdRef.current) return;
     const currentSession = sessionsRef.current.find(s => s.id === currentSessionIdRef.current);
@@ -629,6 +673,72 @@ const App: React.FC = () => {
       transcriptions: [...currentSession.transcriptions, newTranscription]
     });
   }, [updateCurrentSession]);
+
+  const addUserTranscription = useCallback((text: string, suffix = 'user-text') => {
+    if (!currentSessionIdRef.current) return;
+    const currentSession = sessionsRef.current.find(s => s.id === currentSessionIdRef.current);
+    if (!currentSession) return;
+    const newTranscription: Transcription = {
+      id: `${Date.now()}-${suffix}`,
+      role: 'user',
+      text,
+      timestamp: Date.now()
+    };
+    updateCurrentSession({
+      transcriptions: [...currentSession.transcriptions, newTranscription]
+    });
+
+    if (isE2EMode) {
+      setTimeout(() => {
+        const tutor = selectedTutorIdRef.current;
+        const tutorMeta = TUTOR_TYPES.find(t => t.id === tutor) || TUTOR_TYPES[0];
+        
+        if (tutor === 'ai-interviewer') {
+          addModelTranscription(
+            `Here is the mock interview wrap-up report:
+
+1) Interview Overview: The candidate demonstrated excellent knowledge of software engineering principles.
+2) Key Points Observed: Strong code styling, great system design choices.
+3) Category Scores:
+   - AI Dev: 8/10
+   - AI Systems: 7/10
+   - Frontend: 9/10
+   - Backend: 8/10
+   - AI Product/Design: 9/10
+4) Overall Score: 85/100
+5) Strengths:
+   - Exceptional clarity in explaining trade-offs.
+   - Solid understanding of state management.
+6) Gaps and Risks:
+   - Could focus more on database scaling under high load.
+7) Actionable Suggestions:
+   - Study write-through and write-behind cache strategies.
+   - Deep dive into sharding options.
+8) Hiring Signal: Strong Yes`,
+            'mock-report'
+          );
+        } else if (tutor === 'claude-code-tutor') {
+          addModelTranscription(
+            `I am the Claude Code Tutor. Claude Code is a command-line agentic coding assistant by Anthropic.
+You can launch interactive sessions with 'claude' or continue discussions with 'claude -c'.
+For automated code review, use '/code-review' or run 'claude -p "query"' in your CI/CD pipeline.
+Let me know what you want to build or how I can help you set up 'CLAUDE.md'!`,
+            'mock-reply'
+          );
+        } else if (tutor === 'adhd-tutor') {
+          addModelTranscription(
+            `Hello, I am your ADHD Mock Specialist doctor. I am here to help you practice and organize your thoughts for your upcoming ADHD evaluation. Let's do a mock diagnostic interview. To begin, can you tell me what symptoms or challenges first made you suspect you might have ADHD, and how they impact your day-to-day life?`,
+            'mock-reply'
+          );
+        } else {
+          addModelTranscription(
+            `Hi, this is a simulated reply in E2E mode from ${tutorMeta.name}. How can I assist you today?`,
+            'mock-reply'
+          );
+        }
+      }, 600);
+    }
+  }, [updateCurrentSession, addModelTranscription]);
 
   useEffect(() => {
     if (!queuedChatAfterStart || status !== SessionStatus.ACTIVE || !sessionRef.current) return;
@@ -731,6 +841,7 @@ const handleMessage = async (message: LiveServerMessage) => {
       }
       if (isE2EMode) {
         setStatus(SessionStatus.ACTIVE);
+        playSessionSound('start');
         setSessionDuration(0);
         setConnectionError(null);
         if (!currentSessionIdRef.current) createNewSession();
@@ -814,6 +925,7 @@ const handleMessage = async (message: LiveServerMessage) => {
           onopen: () => {
             console.log('Session opened');
             setStatus(SessionStatus.ACTIVE);
+            playSessionSound('start');
             setRetryCount(0);
             const source = inputCtx.createMediaStreamSource(micStream);
             const processor = inputCtx.createScriptProcessor(4096, 1, 1);
@@ -882,6 +994,11 @@ const handleMessage = async (message: LiveServerMessage) => {
           tracks.forEach(track => { try { track.stop(); } catch (e) { console.warn('Error stopping video track:', e); } });
           videoRef.current.srcObject = null;
         }
+        if (screenStreamRef.current) {
+          const tracks = screenStreamRef.current.getTracks();
+          tracks.forEach(track => { try { track.stop(); } catch (e) { console.warn('Error stopping screen track:', e); } });
+          screenStreamRef.current = null;
+        }
         setIsScreenSharing(false);
         setScreenShareError(null);
       } catch (error) {
@@ -904,16 +1021,9 @@ const handleMessage = async (message: LiveServerMessage) => {
         video: { cursor: 'always' } as any,
         audio: false
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = screenStream;
-        screenStream.getVideoTracks()[0].onended = () => {
-          setIsScreenSharing(false);
-          if (videoRef.current) { videoRef.current.srcObject = null; }
-          setScreenShareError(null);
-        };
-        setIsScreenSharing(true);
-        setScreenShareError(null);
-      }
+      screenStreamRef.current = screenStream;
+      setIsScreenSharing(true);
+      setScreenShareError(null);
     } catch (error: any) {
       console.error('Screen share error:', error);
       let errorMessage = 'Failed to start screen sharing';
@@ -963,6 +1073,18 @@ const handleMessage = async (message: LiveServerMessage) => {
     }
     return () => { if (interval) clearInterval(interval); };
   }, [isScreenSharing, status, networkQuality]);
+
+  useEffect(() => {
+    if (isScreenSharing && screenStreamRef.current && videoRef.current) {
+      videoRef.current.srcObject = screenStreamRef.current;
+      screenStreamRef.current.getVideoTracks()[0].onended = () => {
+        setIsScreenSharing(false);
+        if (videoRef.current) { videoRef.current.srcObject = null; }
+        screenStreamRef.current = null;
+        setScreenShareError(null);
+      };
+    }
+  }, [isScreenSharing]);
 
   const keyboardHandlerStateRef = useRef({
 status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenShare, isRecordingKey, isSettingsOpen, setIsSettingsOpen
@@ -1015,6 +1137,8 @@ status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenSha
     { id: 'language-coach', label: 'Language Coach' },
     { id: 'drill-sergeant', label: 'Drill Sergeant' },
     { id: 'ged-tutor', label: 'GED Prep' },
+    { id: 'claude-code-tutor', label: 'Claude Code' },
+    { id: 'adhd-tutor', label: 'ADHD Mock Specialist' },
   ];
 
   const anyToastVisible = connectionError || screenShareError || apiKeyError || errorNotification || showAutoSaveToast;
@@ -1123,6 +1247,7 @@ status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenSha
             selectedTutorMeta={selectedTutorMeta}
             transcriptScrollRef={transcriptScrollRef}
             currentSession={currentSession}
+            videoRef={videoRef}
           />
 
           <ChatInput
