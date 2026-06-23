@@ -242,6 +242,7 @@ const App: React.FC = () => {
 
   const [activeInputText, setActiveInputText] = useState('');
   const [activeOutputText, setActiveOutputText] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [queuedChatAfterStart, setQueuedChatAfterStart] = useState<string | null>(null);
 
@@ -688,6 +689,8 @@ const App: React.FC = () => {
       transcriptions: [...currentSession.transcriptions, newTranscription]
     });
 
+    setIsThinking(true);
+
     if (isE2EMode) {
       setTimeout(() => {
         const tutor = selectedTutorIdRef.current;
@@ -696,7 +699,7 @@ const App: React.FC = () => {
         if (tutor === 'ai-interviewer') {
           addModelTranscription(
             `Here is the mock interview wrap-up report:
-
+ 
 1) Interview Overview: The candidate demonstrated excellent knowledge of software engineering principles.
 2) Key Points Observed: Strong code styling, great system design choices.
 3) Category Scores:
@@ -736,9 +739,10 @@ Let me know what you want to build or how I can help you set up 'CLAUDE.md'!`,
             'mock-reply'
           );
         }
+        setIsThinking(false);
       }, 600);
     }
-  }, [updateCurrentSession, addModelTranscription]);
+  }, [updateCurrentSession, addModelTranscription, setIsThinking]);
 
   useEffect(() => {
     if (!queuedChatAfterStart || status !== SessionStatus.ACTIVE || !sessionRef.current) return;
@@ -781,6 +785,7 @@ const handleMessage = async (message: LiveServerMessage) => {
     if (message.serverContent?.inputTranscription) {
       currentInputText.current += message.serverContent.inputTranscription.text;
       setActiveInputText(currentInputText.current);
+      setIsThinking(false);
     }
     if (message.serverContent?.outputTranscription) {
       let newlyGeneratedText = message.serverContent.outputTranscription.text;
@@ -791,6 +796,7 @@ const handleMessage = async (message: LiveServerMessage) => {
         playErrorSound();
       }
       setActiveOutputText(currentOutputText.current);
+      setIsThinking(false);
     }
 
     if (message.serverContent?.turnComplete) {
@@ -811,6 +817,7 @@ const handleMessage = async (message: LiveServerMessage) => {
       currentOutputText.current = '';
       setActiveInputText('');
       setActiveOutputText('');
+      setIsThinking(false);
     }
 
     if (message.serverContent?.interrupted) {
@@ -829,6 +836,7 @@ const handleMessage = async (message: LiveServerMessage) => {
       });
       audioSourcesRef.current.clear();
       nextStartTimeRef.current = 0;
+      setIsThinking(false);
     }
   };
 
@@ -1248,6 +1256,7 @@ status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenSha
             transcriptScrollRef={transcriptScrollRef}
             currentSession={currentSession}
             videoRef={videoRef}
+            isThinking={isThinking}
           />
 
           <ChatInput

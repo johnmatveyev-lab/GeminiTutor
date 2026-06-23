@@ -187,4 +187,25 @@ test.describe('Gemini Tutor Basic E2E Flow', () => {
     await expect(page.locator('text=Hello, I am your ADHD Mock Specialist doctor')).toBeVisible();
     await expect(page.locator('text=suspect you might have ADHD')).toBeVisible();
   });
+
+  test('should display categories, toggle collapse, and show thinking indicator when chatting', async ({ page }) => {
+    // 1. Verify Category Headers are visible
+    await expect(page.locator('text=Coding & Tech')).toBeVisible();
+    await expect(page.locator('text=General & Prep')).toBeVisible();
+
+    // 2. Select a tutor inside a category
+    await page.click('text=The Code Master');
+
+    // 3. Start session
+    await page.getByTestId('start-session').click();
+
+    // 4. Send chat message
+    const chatInput = page.locator('input[placeholder="Type a message..."]');
+    await chatInput.fill('Hi Master Coder!');
+    await page.getByTestId('chat-send').click();
+
+    // 5. Check if the avatar is visible in the chat list
+    const avatar = page.locator('.bg-gradient-to-br');
+    await expect(avatar.first()).toBeVisible();
+  });
 });

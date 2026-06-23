@@ -240,3 +240,27 @@ export const ADAPTIVE_QUALITY = {
   medium: { fps: 2, quality: 0.7 },
   low: { fps: 1, quality: 0.5 }
 };
+
+export const TUTOR_CATEGORIES = [
+  {
+    id: 'coding-technical',
+    name: 'Coding & Tech',
+    tutorIds: ['claude-code-tutor', 'code-master', 'ai-interviewer']
+  },
+  {
+    id: 'academics-general',
+    name: 'General & Prep',
+    tutorIds: ['generalist', 'ged-tutor', 'google-certificate-tutor']
+  },
+  {
+    id: 'languages-writing',
+    name: 'Languages & Arts',
+    tutorIds: ['language-coach', 'creative-muse']
+  },
+  {
+    id: 'support-personality',
+    name: 'Support & Coaching',
+    tutorIds: ['adhd-tutor', 'empath', 'drill-sergeant']
+  }
+];
+

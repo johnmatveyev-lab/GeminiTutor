@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '../lib/utils';
 import { SessionStatus, ChatSession } from '../types';
-import { TUTOR_TYPES } from '../constants';
+import { TUTOR_TYPES, TUTOR_CATEGORIES } from '../constants';
+import { Avatar } from './Avatar';
 
 const sidebarItems = [
   {
@@ -65,14 +66,37 @@ export const SessionSidebar: React.FC<{
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
 
-  const modeTutorItems = [
-    { id: 'generalist', label: 'Tutor' },
-    { id: 'language-coach', label: 'Language Coach' },
-    { id: 'drill-sergeant', label: 'Drill Sergeant' },
-    { id: 'ged-tutor', label: 'GED Prep' },
-    { id: 'claude-code-tutor', label: 'Claude Code' },
-    { id: 'adhd-tutor', label: 'ADHD Mock Specialist' },
-  ];
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {
+      'coding-technical': true,
+      'academics-general': false,
+      'languages-writing': false,
+      'support-personality': false,
+    };
+    
+    const selectedCat = TUTOR_CATEGORIES.find(cat => cat.tutorIds.includes(selectedTutorId));
+    if (selectedCat) {
+      initial[selectedCat.id] = true;
+    }
+    return initial;
+  });
+
+  useEffect(() => {
+    const selectedCat = TUTOR_CATEGORIES.find(cat => cat.tutorIds.includes(selectedTutorId));
+    if (selectedCat) {
+      setExpandedCategories(prev => ({
+        ...prev,
+        [selectedCat.id]: true
+      }));
+    }
+  }, [selectedTutorId]);
+
+  const toggleCategory = (catId: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [catId]: !prev[catId]
+    }));
+  };
 
   const qualityDotColor = networkQuality === 'high' ? 'bg-green-400' : networkQuality === 'medium' ? 'bg-yellow-400' : 'bg-red-400';
 
@@ -147,23 +171,61 @@ export const SessionSidebar: React.FC<{
         </div>
 
         {!isSidebarCollapsed && (
-          <div className="px-5 pt-5">
-            <p className="text-xs uppercase tracking-wider text-white/35 mb-2">Modes</p>
-            <div className="space-y-1.5">
-              {modeTutorItems.map((mode) => {
-                const tutor = TUTOR_TYPES.find((t) => t.id === mode.id);
-                if (!tutor) return null;
+          <div className="px-5 pt-5 flex-shrink-0">
+            <p className="text-xs uppercase tracking-wider text-white/35 mb-2">Categories</p>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 select-none scrollbar-thin">
+              {TUTOR_CATEGORIES.map((cat) => {
+                const isExpanded = !!expandedCategories[cat.id];
                 return (
-                  <button
-                    key={mode.id}
-                    onClick={() => setSelectedTutorId(mode.id)}
-                    className={cn(
-                      'w-full text-left px-3 py-2 rounded-xl transition-colors text-sm',
-                      selectedTutorId === mode.id ? 'bg-white/12 text-white' : 'text-white/70 hover:bg-white/8'
+                  <div key={cat.id} className="rounded-xl border border-white/5 bg-white/4 overflow-hidden">
+                    <button
+                      onClick={() => toggleCategory(cat.id)}
+                      className="w-full px-3 py-2 flex items-center justify-between hover:bg-white/8 transition-colors text-left"
+                    >
+                      <span className="text-xs font-semibold text-white/85 tracking-wide">{cat.name}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-white/5 border border-white/8 text-white/45 font-mono">
+                          {cat.tutorIds.length}
+                        </span>
+                        <svg
+                          className={cn(
+                            "w-3 h-3 text-white/40 transition-transform duration-200 ease-out",
+                            isExpanded && "rotate-180"
+                          )}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </button>
+                    
+                    {isExpanded && (
+                      <div className="px-1 pb-1 pt-0.5 space-y-1 bg-black/10 border-t border-white/4">
+                        {cat.tutorIds.map((tutorId) => {
+                          const tutor = TUTOR_TYPES.find((t) => t.id === tutorId);
+                          if (!tutor) return null;
+                          const isSelected = selectedTutorId === tutorId;
+                          return (
+                            <button
+                              key={tutorId}
+                              onClick={() => setSelectedTutorId(tutorId)}
+                              className={cn(
+                                'w-full text-left px-2 py-1.5 rounded-lg transition-all duration-200 text-sm flex items-center gap-2',
+                                isSelected
+                                  ? 'bg-blue-600/90 text-white font-medium shadow-inner'
+                                  : 'text-white/70 hover:bg-white/6 hover:text-white'
+                              )}
+                            >
+                              <Avatar id={tutorId} className="w-5 h-5 rounded-full border border-white/10" />
+                              <span className="truncate flex-1">{tutor.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
-                  >
-                    {mode.label}
-                  </button>
+                  </div>
                 );
               })}
             </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '../lib/utils';
 import { SessionStatus, Transcription, ChatSession } from '../types';
+import { Avatar } from './Avatar';
 
 export const TranscriptionList: React.FC<{
   transcriptions: Transcription[];
@@ -15,6 +16,7 @@ export const TranscriptionList: React.FC<{
   transcriptScrollRef: React.RefObject<HTMLDivElement | null>;
   currentSession: ChatSession | null;
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  isThinking: boolean;
 }> = ({
   transcriptions,
   activeInputText,
@@ -28,6 +30,7 @@ export const TranscriptionList: React.FC<{
   transcriptScrollRef,
   currentSession,
   videoRef,
+  isThinking,
 }) => {
   const [copied, setCopied] = React.useState(false);
 
@@ -133,7 +136,8 @@ export const TranscriptionList: React.FC<{
         {transcriptions.map((item) => {
           const isUser = item.role === 'user';
           return (
-            <div key={item.id} className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
+            <div key={item.id} className={cn('flex items-end gap-2.5', isUser ? 'justify-end' : 'justify-start')}>
+              {!isUser && <Avatar id={selectedTutorMeta.id} className="w-8 h-8 rounded-full border border-white/10 shadow-sm" />}
               <div className={cn(
                 'max-w-[78%] px-5 py-3 rounded-3xl text-[15px] leading-relaxed shadow-sm',
                 isUser
@@ -142,20 +146,33 @@ export const TranscriptionList: React.FC<{
               )}>
                 {item.text}
               </div>
+              {isUser && <Avatar id="user" className="w-8 h-8 rounded-full border border-white/10 shadow-sm" />}
             </div>
           );
         })}
         {activeInputText && (
-          <div className="flex justify-end">
-            <div className="max-w-[78%] px-5 py-3 rounded-3xl rounded-br-xl bg-blue-500/80 text-white">
+          <div className="flex items-end gap-2.5 justify-end">
+            <div className="max-w-[78%] px-5 py-3 rounded-3xl rounded-br-xl bg-blue-500/80 text-white shadow-sm">
               {activeInputText}
             </div>
+            <Avatar id="user" className="w-8 h-8 rounded-full border border-white/10 shadow-sm" />
           </div>
         )}
         {activeOutputText && (
-          <div className="flex justify-start">
-            <div className="max-w-[78%] px-5 py-3 rounded-3xl rounded-bl-xl bg-white/5 border border-white/10 text-white/90">
+          <div className="flex items-end gap-2.5 justify-start">
+            <Avatar id={selectedTutorMeta.id} className="w-8 h-8 rounded-full border border-white/10 shadow-sm" />
+            <div className="max-w-[78%] px-5 py-3 rounded-3xl rounded-bl-xl bg-white/5 border border-white/10 text-white/90 shadow-sm">
               {activeOutputText}
+            </div>
+          </div>
+        )}
+        {isThinking && (
+          <div className="flex items-end gap-2.5 justify-start">
+            <Avatar id={selectedTutorMeta.id} className="w-8 h-8 rounded-full border border-white/10 shadow-sm" />
+            <div className="max-w-[78%] px-5 py-4 rounded-3xl rounded-bl-xl bg-white/5 border border-white/10 text-white/90 flex items-center gap-1.5 shadow-sm min-w-[72px] justify-center">
+              <span className="w-2.5 h-2.5 rounded-full bg-white/50 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2.5 h-2.5 rounded-full bg-white/50 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2.5 h-2.5 rounded-full bg-white/50 animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
           </div>
         )}
