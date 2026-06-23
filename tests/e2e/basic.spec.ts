@@ -208,4 +208,36 @@ test.describe('Gemini Tutor Basic E2E Flow', () => {
     const avatar = page.locator('.bg-gradient-to-br');
     await expect(avatar.first()).toBeVisible();
   });
+
+  test('should support attaching files, showing preview, and clearing on submit', async ({ page }) => {
+    // 1. Verify that the attachment hidden input and paperclip button exist
+    const attachBtn = page.locator('button[title="Attach file (image, PDF, text)"]');
+    await expect(attachBtn).toBeVisible();
+
+    // 2. Select a tutor and start session
+    await page.click('text=The Code Master');
+    await page.getByTestId('start-session').click();
+
+    // 3. Upload a mock text file using the hidden file input
+    const fileInput = page.locator('input[type="file"]');
+    await fileInput.setInputFiles({
+      name: 'notes.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('Extracted text content from study notes.')
+    });
+
+    // 4. Verify preview tray renders the file
+    await expect(page.locator('text=notes.txt')).toBeVisible();
+
+    // 5. Send message
+    const chatInput = page.locator('input[placeholder="Type a message..."]');
+    await chatInput.fill('Please read my notes');
+    await page.getByTestId('chat-send').click();
+
+    // 6. Verify that the file attachment indicator displays in the chat list
+    await expect(page.locator('text=📎 Attached files: notes.txt')).toBeVisible();
+
+    // 7. Verify that the attachment preview tray is cleared after submission
+    await expect(page.getByTestId('attachments-preview')).not.toBeVisible();
+  });
 });

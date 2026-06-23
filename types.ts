@@ -36,3 +36,12 @@ export interface TutorType {
   systemInstruction: string;
   voiceName: string;
 }
+
+export interface Attachment {
+  id: string;
+  name: string;
+  type: 'image' | 'pdf' | 'text';
+  dataUrl?: string; // Base64 data url for images/screenshots
+  textContent?: string; // Extracted text for documents
+}
+

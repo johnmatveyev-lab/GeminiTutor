@@ -11,7 +11,8 @@ import {
   JPEG_QUALITY,
   ADAPTIVE_QUALITY
 } from './constants';
-import { SessionStatus, Transcription, ChatSession } from './types';
+import { SessionStatus, Transcription, ChatSession, Attachment } from './types';
+import { fileToDataURL, fileToText, extractTextFromPDF } from './services/fileUtils';
 import {
   decode,
   decodeAudioData,
@@ -243,8 +244,32 @@ const App: React.FC = () => {
   const [activeInputText, setActiveInputText] = useState('');
   const [activeOutputText, setActiveOutputText] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [queuedChatAfterStart, setQueuedChatAfterStart] = useState<string | null>(null);
+
+  const onAttachFiles = useCallback(async (files: FileList) => {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      try {
+        if (file.type.startsWith('image/')) {
+          const dataUrl = await fileToDataURL(file);
+          setAttachments(prev => [...prev, { id, name: file.name, type: 'image', dataUrl }]);
+        } else if (file.type === 'application/pdf') {
+          const textContent = await extractTextFromPDF(file);
+          setAttachments(prev => [...prev, { id, name: file.name, type: 'pdf', textContent }]);
+        } else {
+          // Default to text file reading
+          const textContent = await fileToText(file);
+          setAttachments(prev => [...prev, { id, name: file.name, type: 'text', textContent }]);
+        }
+      } catch (err) {
+        console.error('Failed to attach file:', err);
+      }
+    }
+  }, []);
 
   const createNewSession = useCallback(() => {
     const now = new Date();
@@ -267,6 +292,7 @@ const App: React.FC = () => {
     setSessionDuration(0);
     setActiveInputText('');
     setActiveOutputText('');
+    setAttachments([]);
   }, [selectedTutorId, selectedVoice]);
 
   const selectSession = useCallback((sessionId: string) => {
@@ -284,6 +310,7 @@ const App: React.FC = () => {
       setSelectedVoice(session.voice);
       setActiveInputText('');
       setActiveOutputText('');
+      setAttachments([]);
     }
   }, [sessions, status]);
 
@@ -301,11 +328,13 @@ const App: React.FC = () => {
         setSelectedVoice(session.voice);
         setActiveInputText('');
         setActiveOutputText('');
+        setAttachments([]);
       } else {
         setCurrentSessionId(null);
         setSessionDuration(0);
         setActiveInputText('');
         setActiveOutputText('');
+        setAttachments([]);
       }
 
       setPendingSessionId(null);
@@ -323,6 +352,7 @@ const App: React.FC = () => {
         setSelectedVoice(session.voice);
         setActiveInputText('');
         setActiveOutputText('');
+        setAttachments([]);
       }
       setPendingSessionId(null);
       setSessionSwitchWarning(false);
@@ -359,7 +389,7 @@ const App: React.FC = () => {
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
     const text = chatInput.trim();
-    if (!text) return;
+    if (!text && attachments.length === 0) return;
 
     if (!currentSessionId) {
       createNewSession();
@@ -370,21 +400,58 @@ const App: React.FC = () => {
       return;
     }
 
+    // Process document texts
+    let payloadText = text;
+    const docAttachments = attachments.filter(a => a.type === 'pdf' || a.type === 'text');
+    if (docAttachments.length > 0) {
+      if (!payloadText) {
+        payloadText = "Analyze the attached documents.";
+      }
+      payloadText += "\n\n[Attached Files Content]:";
+      docAttachments.forEach(doc => {
+        payloadText += `\n\n--- File: ${doc.name} ---\n${doc.textContent}`;
+      });
+    }
+
     if (status !== SessionStatus.ACTIVE || !sessionRef.current) {
-      setQueuedChatAfterStart(text);
+      setQueuedChatAfterStart(payloadText || "Start");
       setChatInput('');
       void startSession();
       return;
     }
 
-    const sent = sendClientTurn(text);
+    // Active session: send attached images
+    const imgAttachments = attachments.filter(a => a.type === 'image' && a.dataUrl);
+    imgAttachments.forEach(img => {
+      try {
+        const base64 = img.dataUrl!.split(',')[1];
+        sessionRef.current?.sendRealtimeInput({
+          video: { data: base64, mimeType: 'image/jpeg' }
+        });
+      } catch (err) {
+        console.error('Failed to send image attachment:', err);
+      }
+    });
+
+    const sentText = payloadText || "Analyze the attached images.";
+    const sent = sendClientTurn(sentText);
     if (!sent) {
       setConnectionError('Message could not be sent. Please restart the session and try again.');
       return;
     }
 
-    addUserTranscription(text, 'user-text');
+    // Generate nice display text for the chat UI
+    let displayUiText = text;
+    if (attachments.length > 0) {
+      if (!displayUiText) {
+        displayUiText = "Sent attachments";
+      }
+      displayUiText += `\n\n📎 Attached files: ${attachments.map(a => a.name).join(', ')}`;
+    }
+
+    addUserTranscription(displayUiText, 'user-text');
     setChatInput('');
+    setAttachments([]);
   };
 
   useEffect(() => {
@@ -753,15 +820,41 @@ Let me know what you want to build or how I can help you set up 'CLAUDE.md'!`,
       return;
     }
 
+    // Send queued images if any
+    const imgAttachments = attachments.filter(a => a.type === 'image' && a.dataUrl);
+    imgAttachments.forEach(img => {
+      try {
+        const base64 = img.dataUrl!.split(',')[1];
+        sessionRef.current?.sendRealtimeInput({
+          video: { data: base64, mimeType: 'image/jpeg' }
+        });
+      } catch (err) {
+        console.error('Failed to send queued image:', err);
+      }
+    });
+
     const sent = sendClientTurn(queuedText);
     if (!sent) {
       setConnectionError('Message could not be sent. Please restart the session and try again.');
       return;
     }
 
-addUserTranscription(queuedText, 'user-text');
+    // Prepare display text for UI
+    let displayUiText = queuedText;
+    if (displayUiText.includes('[Attached Files Content]:')) {
+      displayUiText = displayUiText.split('[Attached Files Content]:')[0].trim();
+    }
+    if (attachments.length > 0) {
+      if (!displayUiText) {
+        displayUiText = "Sent attachments";
+      }
+      displayUiText += `\n\n📎 Attached files: ${attachments.map(a => a.name).join(', ')}`;
+    }
+
+    addUserTranscription(displayUiText, 'user-text');
     setQueuedChatAfterStart(null);
-  }, [queuedChatAfterStart, status, sendClientTurn, addUserTranscription]);
+    setAttachments([]);
+  }, [queuedChatAfterStart, status, sendClientTurn, addUserTranscription, attachments]);
 
 const handleMessage = async (message: LiveServerMessage) => {
 
@@ -927,7 +1020,11 @@ const handleMessage = async (message: LiveServerMessage) => {
           systemInstruction: systemInstruction,
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } } },
           inputAudioTranscription: {},
-          outputAudioTranscription: {}
+          outputAudioTranscription: {},
+          tools: [
+            { googleSearch: {} },
+            { codeExecution: {} }
+          ]
         },
         callbacks: {
           onopen: () => {
@@ -1277,6 +1374,9 @@ status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenSha
             selectedTutorMeta={selectedTutorMeta}
             isE2EMode={isE2EMode}
             formatTime={formatTime}
+            attachments={attachments}
+            setAttachments={setAttachments}
+            onAttachFiles={onAttachFiles}
           />
 
           <canvas ref={canvasRef} style={{ display: 'none' }} />
