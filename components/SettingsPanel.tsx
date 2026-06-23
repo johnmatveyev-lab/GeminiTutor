@@ -19,6 +19,10 @@ export const SettingsPanel: React.FC<{
   resetTestState: () => void;
   isRecordingKey: boolean;
   setIsRecordingKey: (v: boolean) => void;
+  isGoogleSearchEnabled: boolean;
+  setIsGoogleSearchEnabled: (v: boolean) => void;
+  isCodeExecutionEnabled: boolean;
+  setIsCodeExecutionEnabled: (v: boolean) => void;
 }> = ({
   isSettingsOpen,
   setIsSettingsOpen,
@@ -36,6 +40,10 @@ export const SettingsPanel: React.FC<{
   resetTestState,
   isRecordingKey,
   setIsRecordingKey,
+  isGoogleSearchEnabled,
+  setIsGoogleSearchEnabled,
+  isCodeExecutionEnabled,
+  setIsCodeExecutionEnabled,
 }) => {
   if (!isSettingsOpen) return null;
 
@@ -97,6 +105,54 @@ export const SettingsPanel: React.FC<{
           >
             Light
           </button>
+        </div>
+
+        <div className="border-t border-white/5 pt-3 space-y-3">
+          <h3 className="text-xs font-medium text-white/50 mb-1">Capabilities (API Tools)</h3>
+          
+          <div className="flex items-center justify-between py-1">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-white/90">Google Search</span>
+              <span className="text-[10px] text-white/40">Requires Paid Tier key</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsGoogleSearchEnabled(!isGoogleSearchEnabled)}
+              className={cn(
+                "w-11 h-6 rounded-full transition-colors relative outline-none cursor-pointer",
+                isGoogleSearchEnabled ? "bg-blue-600" : "bg-white/10 border border-white/10"
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow-md",
+                  isGoogleSearchEnabled ? "translate-x-5" : "translate-x-0"
+                )}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between py-1">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-white/90">Python Code Execution</span>
+              <span className="text-[10px] text-white/40">Run code in sandbox</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsCodeExecutionEnabled(!isCodeExecutionEnabled)}
+              className={cn(
+                "w-11 h-6 rounded-full transition-colors relative outline-none cursor-pointer",
+                isCodeExecutionEnabled ? "bg-blue-600" : "bg-white/10 border border-white/10"
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow-md",
+                  isCodeExecutionEnabled ? "translate-x-5" : "translate-x-0"
+                )}
+              />
+            </button>
+          </div>
         </div>
 
         <div className="border-t border-white/5 pt-3">

@@ -126,6 +126,13 @@ const App: React.FC = () => {
     return localStorage.getItem('ai_interview_level') || 'mid';
   });
 
+  const [isGoogleSearchEnabled, setIsGoogleSearchEnabled] = useState(() => {
+    return localStorage.getItem('is_google_search_enabled') === 'true';
+  });
+  const [isCodeExecutionEnabled, setIsCodeExecutionEnabled] = useState(() => {
+    return localStorage.getItem('is_code_execution_enabled') !== 'false';
+  });
+
   
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -139,6 +146,8 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem('selected_voice', selectedVoice); }, [selectedVoice]);
   useEffect(() => { localStorage.setItem('shortcut_key', shortcutKey); }, [shortcutKey]);
   useEffect(() => { localStorage.setItem('ai_interview_level', interviewLevel); }, [interviewLevel]);
+  useEffect(() => { localStorage.setItem('is_google_search_enabled', String(isGoogleSearchEnabled)); }, [isGoogleSearchEnabled]);
+  useEffect(() => { localStorage.setItem('is_code_execution_enabled', String(isCodeExecutionEnabled)); }, [isCodeExecutionEnabled]);
   
   useEffect(() => {
     localStorage.setItem('theme_preference', theme);
@@ -1013,6 +1022,14 @@ const handleMessage = async (message: LiveServerMessage) => {
         : '';
       const systemInstruction = baseInstruction + interviewLevelInstruction + historyContext + `\n\nCRITICAL INSTRUCTION: If you detect the user made a mistake in their coding or input based on their speech or screen share, you MUST start your spoken response with the exact uppercase string "[ERROR]". This will trigger the UI to highlight the error.`;
 
+      const toolsConfig: any[] = [];
+      if (isGoogleSearchEnabled) {
+        toolsConfig.push({ googleSearch: {} });
+      }
+      if (isCodeExecutionEnabled) {
+        toolsConfig.push({ codeExecution: {} });
+      }
+
       const sessionPromise = ai.live.connect({
         model: MODEL_NAME,
         config: {
@@ -1021,10 +1038,7 @@ const handleMessage = async (message: LiveServerMessage) => {
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } } },
           inputAudioTranscription: {},
           outputAudioTranscription: {},
-          tools: [
-            { googleSearch: {} },
-            { codeExecution: {} }
-          ]
+          tools: toolsConfig
         },
         callbacks: {
           onopen: () => {
@@ -1046,7 +1060,7 @@ const handleMessage = async (message: LiveServerMessage) => {
           onmessage: handleMessage,
           onerror: (err) => {
             if (manualSessionStopRef.current) return;
-            console.error('Session error:', err);
+            console.error('Session error detailed event:', err);
             setStatus(SessionStatus.ERROR);
             const maxRetries = 3;
             if (retryCount < maxRetries) {
@@ -1061,8 +1075,12 @@ const handleMessage = async (message: LiveServerMessage) => {
               setConnectionError('Failed to connect after multiple attempts. Please check your internet connection and try again.');
             }
           },
-          onclose: () => {
-            console.log('Session closed');
+          onclose: (event) => {
+            console.log('Session closed event details:', {
+              code: event?.code,
+              reason: event?.reason,
+              wasClean: event?.wasClean
+            });
             if (manualSessionStopRef.current) return;
             stopSession();
           }
@@ -1338,6 +1356,10 @@ status, isScreenSharing, shortcutKey, stopSession, startSession, toggleScreenSha
             resetTestState={resetTestState}
             isRecordingKey={isRecordingKey}
             setIsRecordingKey={setIsRecordingKey}
+            isGoogleSearchEnabled={isGoogleSearchEnabled}
+            setIsGoogleSearchEnabled={setIsGoogleSearchEnabled}
+            isCodeExecutionEnabled={isCodeExecutionEnabled}
+            setIsCodeExecutionEnabled={setIsCodeExecutionEnabled}
           />
 
           <TranscriptionList

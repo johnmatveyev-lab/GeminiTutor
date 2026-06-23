@@ -76,7 +76,12 @@ export const TranscriptionList: React.FC<{
       className="absolute inset-0 overflow-y-auto px-5 md:px-20 lg:px-36 pt-16 md:pt-20 pb-44"
     >
       {isScreenSharing && (
-        <div className="max-w-5xl mx-auto mb-8 rounded-3xl overflow-hidden border border-white/15 bg-black/40">
+        <div className={cn(
+          "max-w-5xl mx-auto mb-8 rounded-3xl overflow-hidden border bg-black/40 transition-all duration-300",
+          status === SessionStatus.ACTIVE
+            ? "border-blue-500/50 shadow-[0_0_24px_rgba(10,132,255,0.25)]"
+            : "border-white/15"
+        )}>
           <video ref={videoRef} autoPlay playsInline className="w-full h-[280px] md:h-[360px] object-contain bg-black/70" />
         </div>
       )}
