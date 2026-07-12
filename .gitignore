@@ -25,3 +25,6 @@ dist-ssr
 *.sw?
 .vercel
 test-results/
+
+.claude/
+firebase-debug.log

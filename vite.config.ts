@@ -12,7 +12,25 @@ export default defineConfig(({ mode }) => {
         port: 3002,
         host: '0.0.0.0',
       },
-      plugins: [react()],
+      plugins: [
+        react(),
+        {
+          // Dev-only: macOS's case-insensitive filesystem makes Vite match the
+          // request path /app to App.tsx and serve the raw module. Rewrite it
+          // to index.html so the SPA router handles it, same as the
+          // vercel.json rewrite does in production.
+          name: 'spa-app-route-rewrite',
+          apply: 'serve' as const,
+          configureServer(server) {
+            server.middlewares.use((req, _res, next) => {
+              if (req.url === '/app' || req.url?.startsWith('/app?')) {
+                req.url = '/index.html';
+              }
+              next();
+            });
+          },
+        },
+      ],
       define: {
         // Expose API key for client-side usage
         'process.env.API_KEY': JSON.stringify(geminiApiKey),
